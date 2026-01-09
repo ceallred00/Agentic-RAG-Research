@@ -1,7 +1,7 @@
 # AI Agents Project
 Building and testing different AI agents and agentic system architectures.
 
-## Overview 🧭
+## Overview 
 This repository provides a lightweight framework for defining, configuring, testing, and benchmarking different agent types and multi-agent system architectures. The code emphasizes clear separation between agent implementations (`think()`/`act()`), configurations, architecture coordination, and experiment-focused notebooks and benchmarks.
 
 Key concepts:
@@ -39,7 +39,7 @@ Key concepts:
 
 See ARCHITECTURE.md for more information on project architecture.
 
-## Getting Started 🚀
+## Getting Started 
 
 1. Create and activate a virtual environment:
 

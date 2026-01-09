@@ -1,14 +1,33 @@
+"""
+This module is the working code for a base agent. 
 
-from typing import List, Optional
+Note that it is not the final version of the agent; rather, it is an in-progress version. 
+
+Future iterations will include:
+- Moving the tools into their own respective files and directories. 
+- Moving the system prompt to the base_agent.yaml file.
+- The graph configuration may get exported to the architecture YAML files, though that is to be decided at a later date.
+
+"""
+
+
+
+from typing import List
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, ToolMessage, SystemMessage, AIMessage, HumanMessage
+from langchain_core.messages import ToolMessage, SystemMessage, AIMessage, HumanMessage
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
-from langgraph.graph.message import add_messages
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 from core.state import AgentState
+from utils.application_streamer import application_streamer
+from utils.process_events import process_events
+from constants import FAKE_DEPARTMENT_ADVISORS
+
 
 
 load_dotenv()
@@ -73,31 +92,20 @@ def send_email(email_content: str):
 
 @tool
 def search_for_advisor(department: str):
-    """Search for an advisor based on the student's department. If the department is not specified, the tool will prompt the user to specify their department.
+    """Search for an advisor based on the student's department. If the department is not specified, you should prompt the user for their department.
     If the department is specified, the tool will search for an advisor in that department.
     Once the advisor is found, return the email address of the advisor to the user.
     Then, ask the user if they would like to draft and send an email to the advisor for further assistance.
     If the user agrees, draft an email using the draft_email tool. 
     """
-    if not department:
-        prompt = "Could you please specify your department?"
-        department = interrupt(prompt)
+    advisor_lookup = {key.lower(): value for key, value in FAKE_DEPARTMENT_ADVISORS.items()}
 
-    fake_department_advisors = {
-        "Computer Science": {"name": "Dr. Smith", "email": "jane.smith@uwf.edu"}, 
-        "Mathematics": {"name": "Dr. Johnson", "email": "john.johnson@uwf.edu"},
-        "Biology": {"name": "Dr. Lee", "email": "sarah.lee@uwf.edu"},
-        "History": {"name": "Dr. Brown", "email": "michael.brown@uwf.edu"}
-    }
-
-    try:
-        advisor_info = fake_department_advisors[department]
-        advisor_name = advisor_info["name"]
-        advisor_email = advisor_info["email"]
-    except KeyError:
-        return "I'm sorry, I couldn't find an advisor for that department. Please check the department name and try again."
+    advisor_info = advisor_lookup.get(department.lower())
     
-    return f"Advisor found. Your advisor is {advisor_name} at {advisor_email}."  # Example response
+    if not advisor_info: 
+        return "I'm sorry, I couldn't find an advisor for that department. Please check the department name and try again."
+
+    return f"Advisor found. Your advisor is {advisor_info['name']} at {advisor_info['email']}."  # Example response
 
 @tool
 def end_conversation() -> str:
@@ -106,18 +114,9 @@ def end_conversation() -> str:
     """
     return "Conversation ended"  # Example response
 
-@tool
-def determine_user_sentiment(user_input: str):
-    """Determine the user's sentiment based on their input.
-    If the user is satisfied with the information provided, or if the user explicitly requests to end the conversation, use the end_conversation tool to end the conversation.
-    If the user is not satisfied with the information provided, ask the user if they would like you to perform a web search for more information, or if they would like to send an email to the advisor for further assistance.
-    """
-    prompt = "Are you satisfied with the information provided?"
-    answer = interrupt(prompt)
-    return answer
 
 # Register the available tools
-tools = [search_web, vectorize_user_input, perform_rag, draft_email, send_email, search_for_advisor, end_conversation, determine_user_sentiment]
+tools = [search_web, vectorize_user_input, perform_rag, draft_email, send_email, search_for_advisor, end_conversation]
 
 # Initialize the model with the available tools
 model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
@@ -129,6 +128,8 @@ def base_agent(state: AgentState) -> AgentState:
         You only have access to information related to the University of West Florida.
         You have access to a variety of tools to assist with these tasks : {tools}
 
+        Workflow:
+            1. Greet the student with a friendly message, explaining who you are and what services you can provide.
         The user will provide input, and you will use the available tools to generate a response. 
         Unless the user has explicitly requested to send an email, or to look up an advisor, the first step in generating a response should be to vectorize the user's input using the vectorize_user_input tool.
         Once the user's input is vectorized, you should perform retrieval augmented generation (RAG) on the vectorized input using the perform_rag tool.
@@ -138,39 +139,32 @@ def base_agent(state: AgentState) -> AgentState:
         Once the advisor is found, draft an email using the draft_email tool and return it to the user for review.
         Once the user is satisfied, send the email using the send_email tool.
 
-        After providing information from any tool call, always use the determine_user_sentiment tool to ask the user if they are satisfied with the information provided.
-
         If the user is satisfied with the information provided, or if the user explicitly requests to end the conversation, first ask the user if they have any additional questions. 
         If the user has no additional questions, use the end_conversation tool to end the conversation.
+
+        If you do not have all of the required arguments for a tool call, you should prompt the user for the required arguments.
         """)
 
     # Rules first + conversation history + most recent user message
-    all_messages = [system_prompt] + list(state["messages"]) + [user_message]
+    messages = [system_prompt] + list(state["messages"])
 
     # Generate a response using the model
-    response = model.invoke(all_messages)
-
-    content = response.content
-
-    if content[0]["type"] == "thinking":
-        print(f"\nAI thoughts: {content[0]['thinking']} ")
+    response = model.invoke(messages) 
     
-    # Print the response and the tools used
-    print(f"\n AI Text: {response.text}")
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        print(f"\nUSING TOOLS: {[tc['name'] for tc in response.tool_calls]}")
-    
-
     # Update the state by returning the old messages + the new user message + the new AI response
-    return {"messages": list(state["messages"]) + [user_message, response]}
+    return {"messages": [response]}
 
-def should_continue(state: AgentState): # Conditional function to determine if the graph should continue or end
+def should_continue(state: AgentState):
+    """ 
+    Conditional function to determine if the graph should continue or end.
+    """
     messages = state["messages"]
     last_message = messages[-1]
     if isinstance(last_message, AIMessage) and not last_message.tool_calls: # Look at last message to see if there are any tool calls. If not, end the graph.
         return "end" # Edge
     else: # If there are tool calls, continue the graph.
         return "continue" # Edge
+
     
 def print_messages(messages):
     """ Print the message in a more readable format."""
@@ -197,18 +191,64 @@ graph.add_conditional_edges(
 )
 graph.add_edge("tool_node", "base_agent")
 
-app = graph.compile()
+# Initialize Memory Checkpointer
+memory = MemorySaver()
 
-user_input = input("User: ")
-user_message = HumanMessage(content=user_input)
-state = AgentState(messages=[user_message])
+# Returns a CompiledStateGraph object
+app = graph.compile(checkpointer=memory)
 
-for step in app.stream(state, stream_mode="values"): #type: ignore
-    if "messages" in step:
-        print_messages(step["messages"])
+
+def run():
+    """
+    Run the base agent conversation loop.
+
+    The graph is invoked when the user provides input.
+    The graph will execute according to its architecture.
+     
+    The conversation continues until the user decides to exit, meaning that the graph may be invoked several times depending on the user's input.
     
+    """
+    print("\n The AI Assistant is ready to help you. Type 'exit' to end the conversation.")
+    # A static thread_id simulates a persistent user session.
+    config: RunnableConfig = {"configurable": {"thread_id": "123"}}
+
+    # current_state is a StateSnapshot object
+    current_state = app.get_state(config)
+
+    # current_state.values is a dictionary.
+    if not current_state.values or not current_state.values.get("messages"):
+        # Kickstart AI
+        initial_input = "Hi there!"
+
+        events = application_streamer(application=app,
+                                      user_input = initial_input, 
+                                      configuration = config, 
+                                      stream_mode = "updates")
+        
+        process_events(events = events, thinking_flag = False)
+
+    while True:
+        try: 
+            user_input = input("\nUser: ")
+            if user_input.lower() in ["exit", "quit"]:
+                print("Exiting the conversation.")
+                break
+        except (KeyboardInterrupt, EOFError):
+            print("\nExiting the conversation.")
+            break
+
+        # Runs the graph one node at a time, streaming intermediate state.
+        events = application_streamer(
+            application = app, 
+            user_input = user_input, 
+            configuration = config, 
+            stream_mode = "updates"
+        )
+
+        process_events(events = events, thinking_flag = True)
 
 
-
-
-
+                    
+    
+if __name__ == "__main__":
+    run()

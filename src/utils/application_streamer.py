@@ -3,6 +3,8 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 
+#TODO: Add logging and error handling here.
+
 def application_streamer(
         application: CompiledStateGraph, 
         user_input: str, 

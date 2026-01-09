@@ -1,6 +1,8 @@
 from typing import Literal, Iterator, List
 from langchain_core.messages import AIMessage, ToolMessage, BaseMessage
 
+#TODO: Add logging and error handling.
+
 def process_events(events: Iterator[dict], thinking_flag: Literal[True, False] = False):
     """
     Events is a generator object, holding a dictionary.
