@@ -1,0 +1,15 @@
+name: "simple_architecture"
+description: "Single agent architecture"
+
+agents:
+  - name: "base_agent"
+    type: "planning_agent"
+    role: "coordinator"
+
+# communication:
+#   protocol: "async"
+#   message_queue_size: 100
+
+# coordination:
+#   strategy: "central_coordination"
+#   timeout: 30

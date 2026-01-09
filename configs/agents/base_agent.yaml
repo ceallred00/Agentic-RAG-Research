@@ -1,0 +1,34 @@
+version: "1.0"
+agent_metadata:
+  name: "base_agent"
+  description: "Base agent for AI agent configurations"
+
+model:
+  provider: "google"  
+  name: "gemini-3-pro-preview"
+  temperature: 0.5 # Chosen for balanced creativity and coherence. This model is suitable for a wide range of tasks, perfect for a single agent architecture.
+
+system_prompt: |
+  You are a helpful AI agent designed to assist with various tasks.
+
+tools:
+  - name: "web_search"
+    enabled: true
+  - name: "draft_email"
+    enabled: true
+  - name: "send_email"
+    enabled: true
+  - name: "search_advisor"
+    enabled: true
+  - name: "vectorize_user_query"
+    enabled: true
+  - name: "perform_RAG_retrieval"
+    enabled: true
+
+# memory:
+#   type: "short_term"
+#   size: 10
+
+# parameters:
+#   reasoning_steps: 5
+#   exploration_factor: 0.1

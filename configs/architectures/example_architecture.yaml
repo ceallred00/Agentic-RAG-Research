@@ -1,0 +1,25 @@
+# Example Architecture Configuration
+# Copy and modify for different architecture implementations
+
+name: "simple_hierarchy"
+type: "hierarchical"
+description: "Simple hierarchical multi-agent architecture"
+
+agents:
+  - name: "planner"
+    type: "planning_agent"
+    role: "coordinator"
+  - name: "executor_1"
+    type: "task_executor"
+    role: "worker"
+  - name: "executor_2"
+    type: "task_executor"
+    role: "worker"
+
+communication:
+  protocol: "async"
+  message_queue_size: 100
+
+coordination:
+  strategy: "central_coordination"
+  timeout: 30

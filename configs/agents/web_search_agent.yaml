@@ -1,0 +1,28 @@
+version: "1.0"
+agent_metadata:
+  name: "web_search_agent"
+  description: "Web search agent for retrieving information from the internet"
+
+model:
+  name: "gemini-3-pro-preview"
+  temperature: 0.3 # Chosen to favor accuracy and relevance.
+
+
+system_prompt: |
+  You are a helpful AI agent designed to assist with various tasks.
+
+# tools:
+#   - name: "search_url"
+#     enabled: true
+#   - name: "extract_content_API"
+#     enabled: true
+#   - name: "summarizer"
+#     enabled: true
+
+# memory:
+#   type: "short_term"
+#   size: 10
+
+# parameters:
+#   reasoning_steps: 5
+#   exploration_factor: 0.1
