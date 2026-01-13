@@ -22,4 +22,5 @@ results/
 research/
 data/*
 !data/.gitkeep
-!data/**/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
