@@ -20,3 +20,6 @@ results/
 .idea/
 .vscode_local/src/*.egg-info
 research/
+data/*
+!data/.gitkeep
+!data/**/.gitkeep

@@ -81,6 +81,11 @@ python -m mypy src
 
 CI should run these checks and may use a pinned `requirements-dev.txt` to ensure reproducible test environments.
 
+## Important Notes
+
+If downloading this package from GitHub, the data directory, which includes the raw and processed subdirectories, does not include the files uploaded to the knowledge base. 
+Prior to using the ingestion, processing, or upload functions contained within src/knowledge_base, the user should upload their own files to the appropriate directory.
+
 ## Helpful Commands
 
 To view the entire project structure from the terminal:
