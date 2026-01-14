@@ -1,7 +1,7 @@
 import logging
-from src.utils.config_loader import ConfigLoader
-from src.core.logging_setup import setup_logging
-from src.core.execution_service import ExecutionService
+from utils.config_loader import ConfigLoader
+from core.logging_setup import setup_logging
+from core.execution_service import ExecutionService
 
 logger = logging.getLogger()
 

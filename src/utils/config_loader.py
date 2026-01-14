@@ -5,10 +5,10 @@ from typing import Union, Dict, Any
 from pydantic import ValidationError
 
 # Import Pydantic models for validation
-from configs.schemas.agent_schemas import AgentConfig
+from schemas.agent_schemas import AgentConfig
 # from confid.schemas.architecture_schemas import ArchitectureConfig
 
-from src.constants import CONFIGS_DIR
+from constants import CONFIGS_DIR
 
 logger=logging.getLogger(__name__)
 

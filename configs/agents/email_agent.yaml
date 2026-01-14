@@ -4,6 +4,7 @@ agent_metadata:
   description: "Email agent for managing and sending emails"
 
 model:
+  provider: "google"
   name: "gemini-3-pro-preview"
   temperature: 1.0 # Chosen for balanced creativity and coherence.
 

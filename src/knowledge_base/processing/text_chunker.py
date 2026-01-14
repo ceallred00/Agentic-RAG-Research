@@ -109,7 +109,10 @@ if __name__=="__main__":
             markdown_content = f.read()
         
         chunker = TextChunker()
+        # Returns List[Document]
         chunks = chunker.split_text(markdown_content)
+        print(type(chunks))
+        print(type(chunks[0]))
 
         for i, chunk in enumerate(chunks[:10]):
             print(f"\n--- Chunk {i+1} ---")

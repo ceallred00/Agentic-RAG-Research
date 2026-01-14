@@ -1,7 +1,7 @@
 
 import pytest
 from src.core.execution_service import ExecutionService
-from configs.schemas.agent_schemas import AgentConfig
+from src.schemas.agent_schemas import AgentConfig
 from unittest.mock import patch
 
 @pytest.fixture
@@ -17,13 +17,15 @@ def sample_agent_configs_objects(sample_agent_config_dict):
 
 @pytest.fixture
 def gemini_api_key_env(monkeypatch):
-    key_value = "test_api_key"
+    key_value = "GEMINI_API_KEY"
     monkeypatch.setenv("GEMINI_API_KEY", key_value)
     yield key_value
 
 @pytest.fixture
 def instance_execution_service(sample_agent_configs_objects):
-    """ Creates an instance of ExecutionService with sample agent configs objects."""
+    """ 
+    Creates an instance of ExecutionService with sample agent configs objects.
+    """
     return ExecutionService(agent_configs=sample_agent_configs_objects)
 
 class TestExecutionService:
@@ -87,6 +89,16 @@ class TestExecutionService:
                 instance_execution_service.get_gemini_client(agent_name="good_test_agent_1")
 
             assert "Client creation failed" in str(excinfo.value)
+        
+        def test_missing_config_file(self, instance_execution_service):
+            #TODO: Write missing_config_file test
+            pass
+    class TestGetEmbeddingClient:
+        """ Test cases for get_embedding_client method. """
+        #TODO: Write test cases for the embedding client.
+
+        def test_happy_path(self, instance_execution_service):
+            pass
 
 
 

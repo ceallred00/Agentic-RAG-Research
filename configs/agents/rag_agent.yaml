@@ -4,6 +4,7 @@ agent_metadata:
   description: "RAG agent for retrieval-augmented generation tasks"
 
 model:
+  provider: "google"
   name: "gemini-3-pro-preview"
   temperature: 0.3 # Chosen to favor accuracy and relevance.
 

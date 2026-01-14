@@ -1,6 +1,6 @@
 import logging
 import sys
-from src.constants import LOG_FILE_PATH
+from constants import LOG_FILE_PATH
 from pathlib import Path
 
 
