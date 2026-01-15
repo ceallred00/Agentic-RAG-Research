@@ -99,7 +99,8 @@ class ExecutionService:
             embedding_client = GoogleGenerativeAIEmbeddings(
                 model=model_name,
                 task_type = task_type,
-                api_key = SecretStr(raw_api_key) # Casting required for type-checker.
+                api_key = SecretStr(raw_api_key), # Casting required for type-checker.,
+                output_dimensionality = 768 # Set for compatibility with Pinecone Vector DB
             )
             logger.info(f"Embedding client created for model '{model_name}' with task type '{task_type}'.")
             return embedding_client

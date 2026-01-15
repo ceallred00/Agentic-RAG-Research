@@ -21,6 +21,20 @@ DATA_DIR = ROOT_DIR/ "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
+# --- Embedding Model Constraints ---
+# Model: gemini-embedding-001
+# Limit: 2048 tokens. 
+    # Ref: https://ai.google.dev/gemini-api/docs/embeddings?authuser=1#model-versions
+# Approximation: 1 token ~= 4 chars. 2048 * 4 = 8192 chars.
+    # Ref: http://ai.google.dev/gemini-api/docs/tokens?authuser=1&lang=python
+# We set a safe buffer at 8000 to avoid API errors.
+GEMINI_EMBEDDING_MAX_CHAR_LIMIT = 8000
+
+# --- Chunking Strategies ---
+# Chunk size set at 2000 chars (approximately 500 words) to ideally capture full procedural contexts in knowledge base.
+# Overlap set to 20% (400 chars) to ensure that contextual information is carried between sections as needed.
+CHUNKING_SIZE = 2000
+CHUNKING_OVERLAP = 400
 
 FAKE_DEPARTMENT_ADVISORS = {
     "Computer Science": {"name": "Dr. Smith", "email": "jane.smith@uwf.edu"}, 

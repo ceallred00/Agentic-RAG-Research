@@ -2,7 +2,7 @@ import logging
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from typing import List, Tuple
-from constants import PROCESSED_DATA_DIR
+from constants import PROCESSED_DATA_DIR, CHUNKING_SIZE, CHUNKING_OVERLAP
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class TextChunker:
     
     This class prioritizies semantic boundaries by first splitting on Markdown headers,
     and then recursively splitting larger sections to fit context windows."""
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, chunk_size: int = CHUNKING_SIZE, chunk_overlap: int = CHUNKING_OVERLAP):
         """
         Initialize the text chunker with configuration settings. 
         
@@ -23,6 +23,7 @@ class TextChunker:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
+        # IMPORTANT - Headers should be specified top-down for the _enrich_metadata method to properly inject the hierarchy.
         self.headers_to_split_on: List[Tuple[str, str]] = [
             ("#", "Header 1"),
             ("##", "Header 2"), 
@@ -36,6 +37,7 @@ class TextChunker:
         Pipeline:
             1. Split by Markdown Headers (preserves structural context).
             2. Split larger sections by Character count (preserves token limits).
+            3. Inject metadata back into the text content so the vector "sees" it.
 
         Returns a List[Documents]. Example format: 
 
@@ -48,11 +50,13 @@ class TextChunker:
 
         try:
             header_splits = self._split_on_headers(text)
-            final_chunks = self._split_recursive(header_splits)
-
+            recursive_chunks = self._split_recursive(header_splits) # Smaller context window
+            final_chunks = self._enrich_metadata(recursive_chunks)
+            
             logger.info(f"Successfully split text into {len(final_chunks)} chunks.")
-
+            
             return final_chunks
+
         except Exception as e:
             logger.error(f"Error during text chunking: {e}", exc_info=True) # Append full stack trace to the log message.
             raise e
@@ -97,7 +101,37 @@ class TextChunker:
         )
 
         return text_splitter.split_documents(documents)
+    def _enrich_metadata(self, documents: List[Document]) -> List[Document]:
+        """
+        Iterates through chunks and prepends the header hierarchy to the content. 
+
+        Before: 
+            Metadata: {'Header 1': 'Admissions', 'Header 2': 'GPA'}
+            Content: "The minimum requirement is 3.0"
+        
+        After:
+            Content: "Context: Admissions > GPA \n The minimum requirement is 3.0"
+        """
+        enriched_docs = []
+        for doc in documents:
+            context_parts = []
+
+            for header in self.headers_to_split_on:
+                header_title = header[1]
+                if header_title in doc.metadata:
+                    context_parts.append(doc.metadata[header_title])
+            
+            if context_parts:
+                context_str = " > ".join(context_parts)
+                new_content =f"Context: {context_str}\n---\n{doc.page_content}"
+
+                doc.page_content = new_content
+
+            # Add doc to the list regardless if markdown headers existed.
+            enriched_docs.append(doc)
     
+        return enriched_docs
+                
 
 # --- Example Usage ---
 if __name__=="__main__":
@@ -114,7 +148,7 @@ if __name__=="__main__":
         print(type(chunks))
         print(type(chunks[0]))
 
-        for i, chunk in enumerate(chunks[:10]):
+        for i, chunk in enumerate(chunks[:100]):
             print(f"\n--- Chunk {i+1} ---")
             print(f"Metadata: {chunk.metadata}")
             print(f"Content Preview: {chunk.page_content}")

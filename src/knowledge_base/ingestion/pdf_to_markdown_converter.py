@@ -41,7 +41,7 @@ class PDFToMarkdownConverter:
 
 # --- Example Usage ---
 if __name__ == "__main__":
-    file_name = "Graduate-Student-Handbook-2024-2025.pdf"
+    file_name = "AFH1.pdf"
 
     processor = PDFToMarkdownConverter()
 

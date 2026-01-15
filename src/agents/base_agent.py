@@ -20,11 +20,14 @@ from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
+from google.genai.errors import ServerError
 from core.state import AgentState
+from core.execution_service import ExecutionService
 from utils.application_streamer import application_streamer
 from utils.process_events import process_events
+from tools.embed_user_query_tool import get_embed_query_tool
 from constants import FAKE_DEPARTMENT_ADVISORS
-from google.genai.errors import ServerError
+
 
 # from utils.architecture_diagram_generator import ArchitectureDiagramGenerator
 # from constants import PROD_DIAGRAM_DIR
@@ -32,6 +35,9 @@ from google.genai.errors import ServerError
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+execution_service = ExecutionService()
+embed_query_tool = get_embed_query_tool(execution_service)
 
 # TODO: Move tools to their own .py files and finalize.
 
@@ -41,13 +47,6 @@ def search_web(query: str):
     Performs a libe web search. Use this ONLY if the perform_rag tool did not provide sufficient information for the user.
     """
     return f"Web search results for query: {query}"  # Example response
-
-@tool
-def vectorize_user_input(user_input: str) -> List[float]:
-    """
-    Converts raw user text into a numerical vector. This is a mandatory prerequisite for using the perform_rag tool.
-    """
-    return [-0.2, 0.1, 0.3, -0.1, 0.2]  # Example vectorized input
 
 @tool
 def perform_rag(user_query_vector: List[float]):
@@ -116,7 +115,7 @@ def end_conversation() -> str:
 
 
 # Register the available tools
-tools = [search_web, vectorize_user_input, perform_rag, draft_email, send_email, search_for_advisor, end_conversation]
+tools = [search_web, embed_query_tool, perform_rag, draft_email, send_email, search_for_advisor, end_conversation]
 
 # Initialize the model with the available tools
 model = ChatGoogleGenerativeAI(model="gemini-pro-latest", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
@@ -127,7 +126,7 @@ def base_agent(state: AgentState) -> AgentState: #type:ignore
 
         CORE WORKFLOW:
         1. INFORMATIONAL QUERIES:
-        - Step A: Always call `vectorize_user_input` first.
+        - Step A: Always call `embed_user_query` first to convert text to a vector.
         - Step B: Pass that vector into `perform_rag`.
         - Step C: Present the results. If the answer is incomplete, offer a `search_web` call.
 
