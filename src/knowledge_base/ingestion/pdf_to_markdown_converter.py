@@ -1,7 +1,7 @@
 import logging
 from langchain_docling.loader import DoclingLoader, ExportType
 from langchain_core.documents import Document
-from constants import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR
+from constants import RAW_DATA_DIR, PROCESSED_DATA_DIR
 from pathlib import Path
 from typing import List, Union
 

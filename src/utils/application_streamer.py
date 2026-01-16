@@ -1,9 +1,10 @@
+import logging
 from typing import Literal, Iterator
 from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 
-#TODO: Add logging and error handling here.
+logger = logging.getLogger(__name__)
 
 def application_streamer(
         application: CompiledStateGraph, 
@@ -22,11 +23,15 @@ def application_streamer(
         stream_mode:
          
     """
+    try: 
+        yield from application.stream(
+            {"messages": [HumanMessage(content=user_input)]}, # Appends the user_input to the state.
+            config = configuration, 
+            stream_mode = stream_mode
+        )
+    except Exception as e:
+        logger.error(f"Error in application_streamer: {e}", exc_info = True)
+        yield {"error": str(e)}
 
-    return application.stream(
-        {"messages": [HumanMessage(content=user_input)]}, # Appends the user_input to the state.
-        config = configuration, 
-        stream_mode = stream_mode
-    )
 
     

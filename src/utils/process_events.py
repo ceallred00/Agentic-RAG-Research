@@ -1,5 +1,8 @@
 from typing import Literal, Iterator, List
 from langchain_core.messages import AIMessage, ToolMessage, BaseMessage
+import logging
+
+logger = logging.getLogger(__name__)
 
 #TODO: Add logging and error handling.
 
@@ -26,6 +29,10 @@ def process_events(events: Iterator[dict], thinking_flag: Literal[True, False] =
     }
     """
     for event in events:
+        if "error" in event:
+            print(f"Error in application_streamer: {event['error']}")
+            return 
+        
         for node_name, values in event.items():
             messages: List[BaseMessage] = values.get("messages", [])
             # Get the last message from the updated state
