@@ -35,7 +35,7 @@ class EmbedUserQueryTool(BaseTool):
         """Synchronous execution of the tool."""
         logger.info(f"Tool '{self.name} processing query: '{user_query}'")
         try:
-            vector = self._embedder.embed_query(user_query)
+            vector = self._embedder.embed_dense_query(user_query)
             logger.info(f"Successfully generated embedding of length {len(vector)}")
             return vector
         except Exception as e:

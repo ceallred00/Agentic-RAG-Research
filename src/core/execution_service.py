@@ -6,6 +6,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from typing import Dict, Literal, Optional
 from schemas.agent_schemas import AgentConfig
 from pydantic import SecretStr
+from pinecone.grpc import PineconeGRPC as Pinecone
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,24 @@ class ExecutionService:
             return embedding_client
         except Exception as e:
             logger.error(f"Error creating Embedding client: {e}")
+            raise
+    def get_pinecone_client(self) -> Pinecone:
+        """ Factory method to create a Pinecone client.
+        
+        Returns:
+            Configured Pinecone (GRPC) client instance.
+        """
+
+        logger.info("Creating Pinecone client.")
+
+        pinecone_api_key = self._validate_api_key("PINECONE_API_KEY")
+
+        try:
+            pc = Pinecone(api_key = pinecone_api_key)
+            logger.info("Pinecone client created successfully.")
+            return pc
+        except Exception as e:
+            logger.error(f"Error creating Pinecone client: {e}")
             raise
 
 

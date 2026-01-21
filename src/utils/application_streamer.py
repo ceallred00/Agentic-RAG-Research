@@ -17,11 +17,27 @@ def application_streamer(
     The .stream() method runs the graph one node at a time, streaming the intermediate state.
 
     Args:
-        application: 
-        user_input:
-        configuration:
-        stream_mode:
-         
+        application (Compiled StateGraph): The compiled LangGraph runnable.
+        user_input (str): The text input from the user.
+        configuration (RunnableConfig): Configuration dict (e.g., thread_id)
+        stream_mode (str): "updates" (change in state) or "values" (full state). Defaults to "updates"
+    
+    Yields:
+        dict: A dictionary containing either:
+            - Node Updates: `{'node_name': {'messages': [...]}}`
+            - Error info: `{'error': 'Error description'}`
+
+    Exception Handling:
+        If an exception occurs during execution (e.g., Network Error, GraphRecursionError), it does NOT
+        raise the exception. 
+
+        Instead, it:
+        1. Logs the full traceback.
+        2. Yields a dictionary `{"error": str(e)}`
+        
+        This prevents the UI or CLI from crashing, allowing the frontend to display a user-friendly error message. 
+        It also keeps the session alive, allowing the user to retry immediately.
+            The user will see the error message, then see User:
     """
     try: 
         yield from application.stream(

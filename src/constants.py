@@ -22,13 +22,24 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
 # --- Embedding Model Constraints ---
+# Token Approximation: 1 token ~= 4 chars. 2048 * 4 = 8192 chars.
+    # Ref: http://ai.google.dev/gemini-api/docs/tokens?authuser=1&lang=python
+# We set a safe buffer at 8000 to avoid API errors. 
+
 # Model: gemini-embedding-001
 # Limit: 2048 tokens. 
     # Ref: https://ai.google.dev/gemini-api/docs/embeddings?authuser=1#model-versions
-# Approximation: 1 token ~= 4 chars. 2048 * 4 = 8192 chars.
-    # Ref: http://ai.google.dev/gemini-api/docs/tokens?authuser=1&lang=python
-# We set a safe buffer at 8000 to avoid API errors.
 GEMINI_EMBEDDING_MAX_CHAR_LIMIT = 8000
+
+# Model: pinecone-sparse-english-v0
+# Limit: 2048 tokens.
+    # Ref: https://docs.pinecone.io/models/pinecone-sparse-english-v0
+PINECONE_EMBEDDING_MAX_CHAR_LIMIT = 8000
+PINECONE_MAX_BATCH_SIZE = 96
+# Max batch size for upserts to Pinecone index to avoid request size limits (2 MB).
+    # Ref: https://docs.pinecone.io/guides/index-data/upsert-data
+# Vectors are heavy on size due to text in metadata and spare representation. 
+PINECONE_UPSERT_MAX_BATCH_SIZE = 50
 
 # --- Chunking Strategies ---
 # Chunk size set at 2000 chars (approximately 500 words) to ideally capture full procedural contexts in knowledge base.

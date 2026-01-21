@@ -1,7 +1,7 @@
 import logging
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from constants import PROCESSED_DATA_DIR, CHUNKING_SIZE, CHUNKING_OVERLAP
 from pathlib import Path
 
@@ -12,7 +12,10 @@ class TextChunker:
     Handles the splitting of text document into smaller chunks for embedding.
     
     This class prioritizies semantic boundaries by first splitting on Markdown headers,
-    and then recursively splitting larger sections to fit context windows."""
+    and then recursively splitting larger sections to fit context windows.
+    
+    The final chunks retain metadata about their header hierarchy and source file, injected in the content.
+    """
     def __init__(self, chunk_size: int = CHUNKING_SIZE, chunk_overlap: int = CHUNKING_OVERLAP):
         """
         Initialize the text chunker with configuration settings. 
@@ -28,9 +31,12 @@ class TextChunker:
             ("#", "Header 1"),
             ("##", "Header 2"), 
             ("###", "Header 3"),
+            ("####", "Header 4"),
+            ("#####", "Header 5"),
+            ("######", "Header 6")
         ]
 
-    def split_text(self, text: str) -> List[Document]:
+    def split_text(self, text: str, source_name: Optional[str] = None) -> List[Document]:
         """
         Primary entry point: Takes raw markdown text and returns fully processed chunks.
 
@@ -38,20 +44,25 @@ class TextChunker:
             1. Split by Markdown Headers (preserves structural context).
             2. Split larger sections by Character count (preserves token limits).
             3. Inject metadata back into the text content so the vector "sees" it.
+        
+        Args:
+            text (str): The raw markdown text to be chunked.
+            source_name (Optional[str]): The name of the file. Used for metadata and content enrichment.
+
 
         Returns a List[Documents]. Example format: 
 
-        [Document(metadata={'Header 1': 'Intro', 'Header 2': 'History'}, page_content='# Intro  \n## History  \nMarkdown[9] is a lightweight markup language for creating formatted text using a plain-text editor. John Gruber created Markdown in 2004 as a markup language that is appealing to human readers in its source code form.[9]'),
-        Document(metadata={'Header 1': 'Intro', 'Header 2': 'History'}, page_content='Markdown is widely used in blogging, instant messaging, online forums, collaborative software, documentation pages, and readme files.'),
-        Document(metadata={'Header 1': 'Intro', 'Header 2': 'Rise and divergence'}, page_content='## Rise and divergence  \nAs Markdown popularity grew rapidly, many Markdown implementations appeared, driven mostly by the need for  \nadditional features such as tables, footnotes, definition lists,[note 1] and Markdown inside HTML blocks.'),
-        Document(metadata={'Header 1': 'Intro', 'Header 2': 'Rise and divergence'}, page_content='#### Standardization  \nFrom 2012, a group of people, including Jeff Atwood and John MacFarlane, launched what Atwood characterised as a standardisation effort.'),
-        Document(metadata={'Header 1': 'Intro', 'Header 2': 'Implementations'}, page_content='## Implementations  \nImplementations of Markdown are available for over a dozen programming languages.')]
+        [Document(metadata={'Header 1': 'Intro', 'Header 2': 'History', 'Source': 'markdown_file.md', 'id': 'markdown_file_chunk_1'}, 
+                  page_content='Context: Source: markdown_file > Intro > History\n---\n## Intro  \n## History  \nMarkdown[9] is a lightweight markup language for creating formatted text using a plain-text editor. John Gruber created Markdown in 2004 as a markup language that is appealing to human readers in its source code form.[9]'),
+        Document(metadata={'Header 1': 'Intro', 'Header 2': 'Rise and divergence', 'Source': 'markdown_file.md', 'id': 'markdown_file_chunk_2'}, 
+                 page_content='Context: Source: markdown_file > Intro > Rise and divergence\n---\n## Rise and divergence  \nAs Markdown popularity grew rapidly, many Markdown implementations appeared, driven mostly by the need for  \nadditional features such as tables, footnotes, definition lists,[note 1] and Markdown inside HTML blocks.'),
+                ...]
         """
 
         try:
             header_splits = self._split_on_headers(text)
             recursive_chunks = self._split_recursive(header_splits) # Smaller context window
-            final_chunks = self._enrich_metadata(recursive_chunks)
+            final_chunks = self._enrich_metadata(recursive_chunks, source_name)
             
             logger.info(f"Successfully split text into {len(final_chunks)} chunks.")
             
@@ -101,20 +112,50 @@ class TextChunker:
         )
 
         return text_splitter.split_documents(documents)
-    def _enrich_metadata(self, documents: List[Document]) -> List[Document]:
+    def _enrich_metadata(self, documents: List[Document], source_name: Optional[str] = None) -> List[Document]:
         """
-        Iterates through chunks and prepends the header hierarchy to the content. 
+        Iterates through chunks to:
+        1. Inject header hierarchy into the content (Context).
+        2. Inject source name into metadata and content.
+        3. Generates a deterministic, unique ID for each chunk.
 
         Before: 
             Metadata: {'Header 1': 'Admissions', 'Header 2': 'GPA'}
             Content: "The minimum requirement is 3.0"
         
         After:
-            Content: "Context: Admissions > GPA \n The minimum requirement is 3.0"
+            Metadata: {'Header 1': 'Admissions', 'Header 2': 'GPA', 'Source': 'graduate-handbook', 'id': 'graduate_handbook_chunk_7'}
+            Content: "Context: Source: graduate-handbook > Admissions > GPA \n The minimum requirement is 3.0"
+        
+        Returns:
+            List[Document]: The enriched documents with updated metadata and content.
         """
         enriched_docs = []
-        for doc in documents:
+        
+        # Create a human-readable source name if provided.
+        readable_source = ""
+        # Create a URL for the source if provided. Used in ID generation.
+        clean_filename_for_id = ""
+        if source_name:
+            # Extract just the stem if a full filename or path is provided.
+            source_name = Path(source_name).stem
+
+            # Readable for semantic context.
+            readable_source = source_name.replace("-", " ").replace("_", " ")
+
+            # Cleaned for ID generation.
+            clean_filename_for_id = source_name.replace(" ","_").replace("-","_").lower()
+        
+        for i, doc in enumerate(documents):
             context_parts = []
+            
+            if source_name:
+                doc.metadata["source"] = readable_source
+
+                chunk_id = f"{clean_filename_for_id}_chunk_{i+1}"
+                doc.metadata["id"] = chunk_id
+
+                context_parts.append(f"Source: {readable_source}")
 
             for header in self.headers_to_split_on:
                 header_title = header[1]

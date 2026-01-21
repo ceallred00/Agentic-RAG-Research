@@ -4,33 +4,47 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-#TODO: Add logging and error handling.
+#TODO: Current front end is CLI based. Future frontends (e.g., web) will need different rendering logic.
 
 def process_events(events: Iterator[dict], thinking_flag: Literal[True, False] = False):
     """
-    Events is a generator object, holding a dictionary.
+    Parses and renders the stream of events from the agent application to the console.
 
-    Each event is a dictionary representing the updated state after each node execution.
+    This function acts as the "Frontend" or "Presentation Layer" for the CLI. It iterates 
+    over the generator, extracts the most recent message from each state update, and 
+    prints it in a user-friendly format.
 
-    Event dictionary:
-        Key: Node Name (Unique to whichever node is being executed)
-        Value: Update made to the Agent State [dict]
-    
-    AgentState dictionary:
-        Key: messages
-        Value: List of message objects (HumanMessage, AIMeessage, ToolMessage, etc.)
+    Args:
+        events (Iterator[dict]): A generator yielding state updates from `application_streamer`.
+        thinking_flag (bool): If True, parses and prints the internal "thinking" blocks 
+                              from the model (if available). Defaults to False.
 
-    Example event structure:
+    Event Structures Handled:
+    -------------------------
+    1. Standard Node Update:
+       {
+           'node_name': {
+               'messages': [AIMessage(content="...", additional_kwargs={}, ...), ...] 
+           }
+       }
+       
+    2. Error Event (yielded by application_streamer on crash):
+       {
+           'error': "Error description string"
+       }
 
-    {'base_agent': 
-        {'messages': 
-            [AIMessage(content="...", additional_kwargs={}, ...)] 
-        }
-    }
+    Processing Logic:
+    -----------------
+    - Error Handling: Checks for the 'error' key immediately and stops processing if found.
+    - Message Extraction: Only processes the *last* message in the 'messages' list for each update.
+    - Rendering: Differentiates output based on message type (AIMessage vs ToolMessage) 
+      and content (Thinking blocks vs. Final response).
     """
+    
     for event in events:
         if "error" in event:
             print(f"Error in application_streamer: {event['error']}")
+            logger.error(f"Error in application_streamer: {event['error']}")
             return 
         
         for node_name, values in event.items():
@@ -57,6 +71,8 @@ def process_events(events: Iterator[dict], thinking_flag: Literal[True, False] =
                 if last_message.tool_calls:
                     for tc in last_message.tool_calls:
                         print(f" Calling: {tc['name']} with {tc['args']}")
+                        logger.info(f" Calling: {tc['name']} with {tc['args']}")
 
             elif isinstance(last_message, ToolMessage):
                 print(f"\n TOOL RESULT: {last_message.content}")
+                logger.info(f"\n TOOL RESULT: {last_message.content}")

@@ -31,7 +31,7 @@ class GeminiEmbedder:
             task_type = "RETRIEVAL_QUERY",
         )
 
-    def embed_KB_document(self, document: Union[List[Document], str]) -> List[List[float]]:
+    def embed_KB_document_dense(self, document: Union[List[Document], str]) -> List[List[float]]:
         """
         Generates embeddings for a knowledge base document or a list of doucments. 
 
@@ -55,7 +55,7 @@ class GeminiEmbedder:
             return embedding_model.embed_documents(texts)
         
 
-    def embed_query(self, query: str) -> List[float]:
+    def embed_dense_query(self, query: str) -> List[float]:
         """ 
         Generates embeddings for a user search query.
 
@@ -93,5 +93,7 @@ if __name__ == "__main__":
         # Returns List[Document]
         chunks = chunker.split_text(markdown_content)
     
-    embeddings = embedder.embed_KB_document(document = chunks)
+    embeddings = embedder.embed_KB_document_dense(document = chunks)
+    print(len(embeddings))
+    print(len(embeddings[0]))
     print(embeddings[0][:10])
