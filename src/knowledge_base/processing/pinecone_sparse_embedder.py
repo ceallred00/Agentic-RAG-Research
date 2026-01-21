@@ -26,7 +26,7 @@ class PineconeSparseEmbedder:
         Generates sparse embeddings for knowledge base documents.
         """
         return self._create_embeddings(task_type = "passage", inputs=inputs)
-    def embed_sparse_query(self, user_query:str):
+    def embed_sparse_query(self, user_query:str) -> List[SparseEmbedding]:
         """
         Generates sparse embeddings for a user's search query.
         """

@@ -11,7 +11,6 @@ from typing import List
 from pinecone.grpc import PineconeGRPC as Pinecone
 
 from knowledge_base.vector_db.upsert_to_vector_db import upsert_to_vector_db
-
 logger = logging.getLogger(__name__)
 
 def PDF_to_KB_Pipeline(pdf_file_names: List[str], kb_name: str):
@@ -106,10 +105,3 @@ if __name__ == "__main__":
     knowledge_base_name = "university-handbook-kb"
     PDF_to_KB_Pipeline(pdf_file_names=pdf_files, kb_name=knowledge_base_name)
             
-
-    
-
-    
-    
-    
-    

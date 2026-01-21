@@ -21,11 +21,11 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from google.genai.errors import ServerError
-from core.state import AgentState
+from core.agent_state import AgentState
 from core.execution_service import ExecutionService
 from utils.application_streamer import application_streamer
 from utils.process_events import process_events
-from tools.embed_user_query_tool import get_embed_query_tool
+from tools.perform_rag_tool import get_perform_rag_tool
 from constants import FAKE_DEPARTMENT_ADVISORS
 
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 execution_service = ExecutionService()
-embed_query_tool = get_embed_query_tool(execution_service)
+perform_rag_tool = get_perform_rag_tool(execution_service, index_name = "university-handbook-kb")
 
 # TODO: Move tools to their own .py files and finalize.
 
@@ -47,16 +47,6 @@ def search_web(query: str):
     Performs a libe web search. Use this ONLY if the perform_rag tool did not provide sufficient information for the user.
     """
     return f"Web search results for query: {query}"  # Example response
-
-@tool
-def perform_rag(user_query_vector: List[float]):
-    """
-    Searches the University of West Florida (UWF) knowledge base using a vector. 
-    Use this to answer UWF-specific questions about policies, courses, or campus life.
-
-    This tool should only be used after the user's input was vectorized using vectorize_user_input.
-    """
-    return "Relevant results from RAG process"  # Example response 
 
 @tool
 def draft_email(user_input: str, advisor_email: str, advisor_name: str, student_name: str, student_email: str):
@@ -115,20 +105,23 @@ def end_conversation() -> str:
 
 
 # Register the available tools
-tools = [search_web, embed_query_tool, perform_rag, draft_email, send_email, search_for_advisor, end_conversation]
+tools = [search_web, perform_rag_tool, draft_email, send_email, search_for_advisor, end_conversation]
 
 # Initialize the model with the available tools
-model = ChatGoogleGenerativeAI(model="gemini-pro-latest", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
+model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
 
 def base_agent(state: AgentState) -> AgentState: #type:ignore
+    """
+    Main decision-making node.
+    """
     system_prompt = SystemMessage(content = f"""
         You are the UWF Student Assistant, a helpful AI dedicated to University of West Florida students.
 
         CORE WORKFLOW:
         1. INFORMATIONAL QUERIES:
-        - Step A: Always call `embed_user_query` first to convert text to a vector.
-        - Step B: Pass that vector into `perform_rag`.
-        - Step C: Present the results. If the answer is incomplete, offer a `search_web` call.
+        - Step A: Call `perform_rag_search` directly using the user's natural language query.
+        - Step B: Present the results based on the context returned.
+        - Step C: If the RAG tool returns insufficient information, offer a `search_web` call.
 
         2. ADVISOR ASSISTANCE:
         - If the user needs to contact an advisor, call `search_for_advisor`.
@@ -163,6 +156,7 @@ def base_agent(state: AgentState) -> AgentState: #type:ignore
             # Update the state by returning the old messages + the new user message + the new AI response
             return {"messages": [response]}
         except ServerError as e:
+            logger.warning(f"Server error on attempt {attempt + 1}: {e}.")
             if attempt == max_retries - 1:
                 raise e
 
@@ -231,10 +225,8 @@ def run():
     # current_state.values is a dictionary.
     if not current_state.values or not current_state.values.get("messages"):
         # Kickstart AI
-        initial_input = "Hi there!"
-
         events = application_streamer(application=app,
-                                      user_input = initial_input, 
+                                      user_input = "Hello!", 
                                       configuration = config, 
                                       stream_mode = "updates")
         
