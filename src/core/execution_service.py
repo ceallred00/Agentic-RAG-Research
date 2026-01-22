@@ -86,7 +86,7 @@ class ExecutionService:
         return gemini_model
     def get_embedding_client(self, model_name: str, task_type: Literal["RETRIEVAL_QUERY", "RETRIEVAL_DOCUMENT"]):
         """
-        Factory method to create a configured Embedding client.
+        Factory method to create a configured Dense Embedding client.
 
         Note: 
             GoogleGenerativeAIEmbeddings class automatically checks for the existence of the GEMINI_API_KEY environment variable.

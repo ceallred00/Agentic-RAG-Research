@@ -1,6 +1,10 @@
 """Pytest configuration and shared fixtures."""
 
 import pytest
+from unittest.mock import patch
+from src.schemas.agent_schemas import AgentConfig
+from pydantic import SecretStr
+from src.core.execution_service import ExecutionService
 
 
 @pytest.fixture
@@ -74,3 +78,53 @@ def valid_architectures_dir(tmp_path):
 
 #TODO: Add a fixture for architecture configs once those are defined.
 
+@pytest.fixture
+def mock_gemini_client():
+    with patch("src.core.execution_service.ChatGoogleGenerativeAI") as MockClient:
+        yield MockClient
+
+@pytest.fixture
+def mock_gemini_dense_embedding_client():
+    with patch("src.core.execution_service.GoogleGenerativeAIEmbeddings") as MockEmbeddingClient:
+        yield MockEmbeddingClient
+
+@pytest.fixture
+def mock_pinecone_client():
+    with patch("src.core.execution_service.Pinecone") as MockPineconeClient:
+        yield MockPineconeClient
+
+@pytest.fixture
+def sample_agent_configs_objects(sample_agent_config_dict):
+    """ Converts sample agent config dicts to AgentConfig Pydantic models. """
+    agent_configs = {name: AgentConfig(**config) for name, config in sample_agent_config_dict.items()}
+    return agent_configs
+
+@pytest.fixture
+def gemini_api_key_env(monkeypatch):
+    key_value = "TEST_GEMINI_API_KEY"
+    monkeypatch.setenv("GEMINI_API_KEY", key_value)
+    yield key_value
+
+@pytest.fixture
+def secret_gemini_api_key_env(gemini_api_key_env):
+    yield SecretStr(gemini_api_key_env)
+
+@pytest.fixture
+def pinecone_api_key_env(monkeypatch):
+    key_value = "TEST_PINECONE_API_KEY"
+    monkeypatch.setenv("PINECONE_API_KEY", key_value)
+    yield key_value
+
+@pytest.fixture
+def instance_agent_config_execution_service(sample_agent_configs_objects):
+    """ 
+    Creates an instance of ExecutionService with sample agent configs objects.
+    """
+    return ExecutionService(agent_configs=sample_agent_configs_objects)
+
+@pytest.fixture
+def instance_execution_service():
+    """ 
+    Creates an instance of ExecutionService with no agent configs.
+    """
+    return ExecutionService()
