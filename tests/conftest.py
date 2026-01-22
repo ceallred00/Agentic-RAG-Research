@@ -5,6 +5,8 @@ from unittest.mock import patch
 from pydantic import SecretStr
 from src.schemas.agent_schemas import AgentConfig
 from src.core.execution_service import ExecutionService
+from src.knowledge_base.ingestion.pdf_to_markdown_converter import PDFToMarkdownConverter
+from pathlib import Path
 
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
@@ -64,6 +66,42 @@ def sample_agent_config_dict():
     }
 
 @pytest.fixture
+def valid_pdf_filename():
+    """Returns a valid PDF filename for testing."""
+    return "valid_test_document.pdf"
+
+@pytest.fixture
+def valid_pdf_filepath(valid_raw_data_dir, valid_pdf_filename):
+    """Creates and returns the path to a valid PDF file in the raw data directory."""
+    pdf_path = Path(valid_raw_data_dir / valid_pdf_filename)
+    pdf_path.touch()  # Create an empty file for testing
+    return pdf_path
+
+@pytest.fixture
+def valid_md_filename():
+    """Returns a valid Markdown filename for testing."""
+    return "valid_test_document.md"
+
+@pytest.fixture
+def valid_md_filepath(valid_processed_data_dir, valid_md_filename):
+    """Creates and returns the path to a valid Markdown file in the processed data directory."""
+    md_path = Path(valid_processed_data_dir / valid_md_filename)
+    md_path.touch()  # Create an empty file for testing
+    return md_path
+
+@pytest.fixture
+def valid_md_file_content():
+    """Returns sample markdown content for testing."""
+    return "# Sample Markdown Content\n\nThis is a test markdown file."
+
+@pytest.fixture
+def valid_md_file(valid_md_filepath, valid_md_file_content):
+    """Creates a valid markdown file with sample content."""
+    with open(valid_md_filepath, "w", encoding="utf-8") as f:
+        f.write(valid_md_file_content)
+    return valid_md_filepath
+
+@pytest.fixture
 def sample_agent_configs_objects(sample_agent_config_dict):
     """Converts sample agent config dicts to AgentConfig Pydantic models."""
     return {
@@ -88,6 +126,24 @@ def valid_architectures_dir(tmp_path):
     architectures_dir = tmp_path / "architectures"
     architectures_dir.mkdir()
     return architectures_dir
+
+@pytest.fixture
+def valid_data_dir(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    return data_dir
+
+@pytest.fixture
+def valid_raw_data_dir(valid_data_dir):
+    raw_data_dir = valid_data_dir / "raw"
+    raw_data_dir.mkdir(parents=True)
+    return raw_data_dir
+
+@pytest.fixture
+def valid_processed_data_dir(valid_data_dir):
+    processed_data_dir = valid_data_dir / "processed"
+    processed_data_dir.mkdir(parents=True)
+    return processed_data_dir
 
 @pytest.fixture
 def gemini_api_key_env(monkeypatch):
@@ -129,6 +185,10 @@ def mock_pinecone_client():
     with patch("src.core.execution_service.Pinecone") as MockPineconeClient:
         yield MockPineconeClient
 
+@pytest.fixture
+def mock_docling_loader():
+    with patch("src.knowledge_base.ingestion.pdf_to_markdown_converter.DoclingLoader") as MockDoclingLoader:
+        yield MockDoclingLoader
 
 # ==============================================================================
 # 4. SERVICE INSTANCES
@@ -144,3 +204,15 @@ def instance_execution_service():
 def instance_agent_config_execution_service(sample_agent_configs_objects):
     """Creates an instance of ExecutionService PRE-LOADED with sample agent configs."""
     return ExecutionService(agent_configs=sample_agent_configs_objects)
+
+# ==============================================================================
+# 5. KNOWLEDGE BASE INSTANCES
+#    - Initialized instances of the knowledge base components.
+# ==============================================================================
+@pytest.fixture
+def pdf_converter(valid_raw_data_dir, valid_processed_data_dir):
+    """Creates an instance of PDFToMarkdownConverter with valid paths."""
+    return PDFToMarkdownConverter(
+        raw_data_path=valid_raw_data_dir,
+        processed_data_path=valid_processed_data_dir
+    )

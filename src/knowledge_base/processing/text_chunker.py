@@ -175,7 +175,7 @@ class TextChunker:
                 
 
 # --- Example Usage ---
-if __name__=="__main__":
+if __name__=="__main__": # pragma: no cover
     file_name = "Graduate-Student-Handbook-2024-2025.md"
     file_path = Path(PROCESSED_DATA_DIR) / file_name
 

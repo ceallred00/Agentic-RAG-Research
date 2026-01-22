@@ -78,7 +78,7 @@ class GeminiEmbedder:
         embedding_model = self.query_client
         return embedding_model.embed_query(query)
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     execution_service = ExecutionService()
     embedder = GeminiEmbedder(execution_service)
 

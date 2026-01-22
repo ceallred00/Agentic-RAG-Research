@@ -70,13 +70,13 @@ class PDFToMarkdownConverter:
                 f.write(content)
 
             logger.info(f"Markdown file saved to: {output_path}")
-        except Exception as e:
+        except IOError as e:
             logger.error(f"Failed to save markdown file {output_filename}: {e}", exc_info=True)
             raise
 
 
 # --- Example Usage ---
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     file_name = "AFH1.pdf"
 
     processor = PDFToMarkdownConverter()

@@ -80,7 +80,7 @@ class PineconeSparseEmbedder:
             yield texts[i:i + batch_size]
     
 # Example Usage
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     try:
         execution_service = ExecutionService()
         embedder = PineconeSparseEmbedder(execution_service)
