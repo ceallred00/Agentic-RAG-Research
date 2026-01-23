@@ -14,7 +14,7 @@ def upsert_to_vector_db(
     sparse_embeddings: List[Any]
 ) -> None:
     """
-    Upserts a batch of text chunks and their embeddings into a Pinecone index.
+    Upserts a batch of text chunks and their embeddings into a Hybrid Pinecone index.
     
     Args:
         pinecone_client: Authenticated Pinecone client.
@@ -22,6 +22,8 @@ def upsert_to_vector_db(
         text_chunks: List of Document objects containing text and metadata.
         dense_embeddings: List of dense vector embeddings corresponding to chunks.
         sparse_embeddings: List of sparse vector embeddings corresponding to chunks.
+    
+    Pinecone Hybrid Index Documentation: https://docs.pinecone.io/guides/search/hybrid-search#use-a-single-hybrid-index
     """
     
     try:
