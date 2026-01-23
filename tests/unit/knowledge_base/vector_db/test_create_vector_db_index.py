@@ -5,13 +5,12 @@ from src.knowledge_base.vector_db.create_vector_db_index import create_vector_db
 class TestCreateVectorDbIndex:
     """Unit tests for the create_vector_db_index function"""
     @patch("src.knowledge_base.vector_db.create_vector_db_index.ServerlessSpec")
-    def test_successful_db_creation(self, MockServerlessSpec, mock_pinecone_client):
+    def test_successful_db_creation(self, MockServerlessSpec, mock_pinecone_client, mock_index_object):
         """
         Verifies that the function initializes the ServerlessSpec correctly, 
         calls create_index with the expected configuration, and returns the
         resulting index object.
         """
-        mock_index_object = MagicMock()
         mock_pinecone_client.Index.return_value = mock_index_object
 
         mock_spec_instance = MagicMock()

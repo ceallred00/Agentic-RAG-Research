@@ -1,7 +1,7 @@
 """Pytest configuration and shared fixtures."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from pydantic import SecretStr
 from pathlib import Path
 from langchain_core.documents import Document
@@ -119,6 +119,7 @@ def valid_md_file(valid_md_filepath, valid_md_file_content):
 
 @pytest.fixture
 def long_text_chunk():
+    """Test chunk used to test the functionality of the TextChunker class"""
     text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     text_doc = Document(
         page_content = text,
@@ -127,6 +128,7 @@ def long_text_chunk():
     return [text_doc]
 @pytest.fixture
 def short_text_chunk():
+    """Text chunk used to test the functionality of the TextChunker class"""
     short_text = "123456789"
     short_doc = Document(
         page_content = short_text,
@@ -134,6 +136,76 @@ def short_text_chunk():
     )
     return [short_doc]
 
+@pytest.fixture
+def text_chunk_with_metadata():
+    """
+    Returns a list containing a single Document object.
+    The page_content is pre-formatted to match the output of TextChunker.split_text,
+    including the injected context header and source metadata.
+    """
+    # TextChunker logic: Source filename is cleaned (stem only, underscores to spaces)
+    # Source: "hello_world.pdf" -> "hello world"
+    expected_context = "Context: Source: hello world > Test > Test Test\n---\nHello World"
+    
+    text_chunk = Document(
+        page_content=expected_context, 
+        metadata={
+            "id": "hello_world_chunk_1", 
+            "source": "hello_world.pdf", 
+            "Header 1": "Test", 
+            "Header 2": "Test Test"
+        }
+    )
+    return [text_chunk]
+
+@pytest.fixture
+def dense_embeddings():
+    """
+    Returns a list containing a single dense vector embedding (list of floats).
+    Matches the structure expected by the upsert function (List[List[float]]).
+    """
+    return [[0.1, 0.2, 0.3]]
+
+@pytest.fixture
+def sparse_embeddings():
+    """
+    Returns a list containing a single Mock object representing a sparse embedding.
+    The mock object has 'sparse_indices' and 'sparse_values' attributes.
+    """
+    sparse_mock = MagicMock()
+    # Indices must be integers, values must be floats
+    sparse_mock.sparse_indices = [1, 5]
+    sparse_mock.sparse_values = [0.9, 0.8]
+
+    # Must be returned as a list to allow zipping with chunks and dense embeddings
+    return [sparse_mock]
+
+@pytest.fixture
+def expected_record():
+    """
+    Returns the expected Pinecone record structure corresponding to the 
+    'text_chunk_with_metadata' fixture.
+
+    The structure includes:
+    - 'id': Extracted from the chunk metadata.
+    - 'values': The single dense vector (float list) for this specific chunk.
+    - 'sparse_values': Dictionary of indices and values.
+    - 'metadata': Contains the page_content as 'text' plus original metadata (minus 'id').
+    """
+    return [{
+        'id': 'hello_world_chunk_1',
+        'values': [0.1, 0.2, 0.3],
+        'sparse_values': {
+            'indices': [1,5],
+            'values': [0.9, 0.8]
+        },
+        'metadata': {
+            'text': "Context: Source: hello world > Test > Test Test\n---\nHello World",
+            'source': 'hello_world.pdf',
+            "Header 1": "Test",
+            "Header 2": "Test Test"
+        }
+    }]
 
 @pytest.fixture
 def sample_agent_configs_objects(sample_agent_config_dict):
@@ -223,6 +295,10 @@ def mock_pinecone_client():
 def mock_docling_loader():
     with patch("src.knowledge_base.ingestion.pdf_to_markdown_converter.DoclingLoader") as MockDoclingLoader:
         yield MockDoclingLoader
+
+@pytest.fixture
+def mock_index_object():
+    return MagicMock()
 
 # ==============================================================================
 # 4. SERVICE INSTANCES
