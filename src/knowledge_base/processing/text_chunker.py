@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from typing import List, Optional, Tuple
@@ -111,7 +112,10 @@ class TextChunker:
             separators = ["\n\n", "\n", " ", ""]
         )
 
+        logger.info(f"Successfully split chunks into: {self.chunk_size} with {self.chunk_overlap} character overlap.")
+
         return text_splitter.split_documents(documents)
+        
     def _enrich_metadata(self, documents: List[Document], source_name: Optional[str] = None) -> List[Document]:
         """
         Iterates through chunks to:
@@ -153,9 +157,17 @@ class TextChunker:
                 doc.metadata["source"] = readable_source
 
                 chunk_id = f"{clean_filename_for_id}_chunk_{i+1}"
-                doc.metadata["id"] = chunk_id
 
                 context_parts.append(f"Source: {readable_source}")
+            
+            else:
+                unique_string = f"{doc.page_content}-{i}"
+                # Generates a 32-character string
+                content_hash = hashlib.md5(unique_string.encode("utf-8")).hexdigest()
+                # Total ID length: 37 characters
+                chunk_id = f"anon_{content_hash}"
+
+            doc.metadata["id"] = chunk_id
 
             for header in self.headers_to_split_on:
                 header_title = header[1]

@@ -3,10 +3,13 @@
 import pytest
 from unittest.mock import patch
 from pydantic import SecretStr
+from pathlib import Path
+from langchain_core.documents import Document
+
 from src.schemas.agent_schemas import AgentConfig
 from src.core.execution_service import ExecutionService
 from src.knowledge_base.ingestion.pdf_to_markdown_converter import PDFToMarkdownConverter
-from pathlib import Path
+from src.knowledge_base.processing.text_chunker import TextChunker
 
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
@@ -91,8 +94,21 @@ def valid_md_filepath(valid_processed_data_dir, valid_md_filename):
 
 @pytest.fixture
 def valid_md_file_content():
-    """Returns sample markdown content for testing."""
-    return "# Sample Markdown Content\n\nThis is a test markdown file."
+    """
+    Returns sample markdown content with sections long enough
+    to force recursive splitting when chunk_size is small.
+    """
+    long_paragraph = "This is a long sentence meant to exceed the chunk limit."
+    return (
+            f"# Title\n"
+            f"Intro text is short.\n"
+            f"## Section 1\n"
+            f"Details about section 1.{long_paragraph}\n"
+            f"### Subsection A\n"
+            f"Deep dive.{long_paragraph}\n"
+            f"## Section 2\n"
+            f"Conclusion."
+        )
 
 @pytest.fixture
 def valid_md_file(valid_md_filepath, valid_md_file_content):
@@ -100,6 +116,24 @@ def valid_md_file(valid_md_filepath, valid_md_file_content):
     with open(valid_md_filepath, "w", encoding="utf-8") as f:
         f.write(valid_md_file_content)
     return valid_md_filepath
+
+@pytest.fixture
+def long_text_chunk():
+    text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    text_doc = Document(
+        page_content = text,
+        metadata = {"Header 1": "Test Header"}
+    )
+    return [text_doc]
+@pytest.fixture
+def short_text_chunk():
+    short_text = "123456789"
+    short_doc = Document(
+        page_content = short_text,
+        metadata = {"Header 1": "First Header", "Header 2": "Second Header "}
+    )
+    return [short_doc]
+
 
 @pytest.fixture
 def sample_agent_configs_objects(sample_agent_config_dict):
@@ -216,3 +250,8 @@ def pdf_converter(valid_raw_data_dir, valid_processed_data_dir):
         raw_data_path=valid_raw_data_dir,
         processed_data_path=valid_processed_data_dir
     )
+
+@pytest.fixture
+def text_chunker():
+    """Returns a TextChunker instance with small chunk sizes for easier testing."""
+    return TextChunker(chunk_size = 50, chunk_overlap = 10)
