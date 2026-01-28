@@ -11,16 +11,19 @@ Future iterations will include:
 """
 
 import logging
+import os
 from typing import List
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage, SystemMessage, AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from google.genai.errors import ServerError
+from pydantic import SecretStr
 from core.agent_state import AgentState
 from core.execution_service import ExecutionService
 from utils.application_streamer import application_streamer
@@ -108,7 +111,10 @@ def end_conversation() -> str:
 tools = [search_web, perform_rag_tool, draft_email, send_email, search_for_advisor, end_conversation]
 
 # Initialize the model with the available tools
-model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
+# model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
+
+# model = ChatOpenAI(model = "openai/gpt-4", api_key = SecretStr(os.getenv("EDEN_AI_API_KEY")), base_url = "https://api.edenai.run/v3/llm", streaming = True).bind_tools(tools)
+model = execution_service.get_eden_ai_client().bind_tools(tools)
 
 def base_agent(state: AgentState) -> AgentState: #type:ignore
     """
@@ -135,6 +141,7 @@ def base_agent(state: AgentState) -> AgentState: #type:ignore
         4. CONVERSATION CLOSURE:
         - If the user indicates they are finished (e.g., "Thanks!", "Goodbye", "I'm all set"), 
             confirm they have no other questions, then call `end_conversation`.
+        - Once you have called `end_conversation`, provide the user with a kind goodbye message.
 
         POLICIES:
         - Only provide information regarding the University of West Florida.

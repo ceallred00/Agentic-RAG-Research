@@ -3,6 +3,7 @@
 import os
 import logging
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_openai import ChatOpenAI
 from typing import Dict, Literal, Optional
 from schemas.agent_schemas import AgentConfig
 from pydantic import SecretStr
@@ -126,6 +127,54 @@ class ExecutionService:
         except Exception as e:
             logger.error(f"Error creating Pinecone client: {e}")
             raise
+    def get_eden_ai_client(self, model_name:str = "openai/gpt-4") -> ChatOpenAI:
+        """
+        Factory method to create an Eden AI client, using the 
+        ChatOpenAI proxy. 
+
+        The proxy was explicitly chosen because the native Eden AI
+        integration (ChatEdenAI) is maintained by the LangChain community.
+        Updates may lag behind, thus utilizing the ChatOpenAI proxy is 
+        a better choice, ensuring stability.
+        
+        This client can be used with any provider offered through EdenAI.
+
+        Args:
+            model_name (str): 
+                The name of the model to use.
+
+                Format: provider/model-name
+                
+                Ex: "openai/gpt-4"
+                    "anthropic/claude-3-5-sonnet-20241022"
+                
+                Available models can be found at this link: 
+                https://docs.edenai.co/v3/how-to/llm/chat-completions#available-models
+        
+        Returns:
+            Configured ChatOpenAI client instance.
+        """
+        logger.info(f"Creating Eden AI client for model: {model_name}")
+
+        eden_api_key = self._validate_api_key("EDEN_AI_API_KEY")
+
+        try:
+            llm = ChatOpenAI(
+                model=model_name,
+                api_key = SecretStr(eden_api_key),
+                base_url = "https://api.edenai.run/v3/llm",
+                streaming = True
+            )
+            logger.info(f"Eden AI client created for model '{model_name}'.")
+            return llm
+        except Exception as e:
+            logger.error(f"Error creating Eden AI client: {e}")
+            raise
+
+
+
+
+
 
 
 

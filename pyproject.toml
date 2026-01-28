@@ -20,7 +20,8 @@ dependencies = [
     "langchain-docling>=2.0.0",
     "langchain-text-splitters>=1.1.0",
     "langchain-pinecone>=0.2.13",
-    "pinecone>= 7.3.0"
+    "pinecone>= 7.3.0",
+    "lanchain-openai">=1.1.7
 ]
 
 [project.optional-dependencies]
