@@ -21,7 +21,9 @@ dependencies = [
     "langchain-text-splitters>=1.1.0",
     "langchain-pinecone>=0.2.13",
     "pinecone>= 7.3.0",
-    "lanchain-openai">=1.1.7
+    "langchain-openai>=1.1.7",
+    "opencv-python >= 4.13", # OpenCV 4.13+ require to support Numpy 2.0+
+    "numpy > 2.0.0"
 ]
 
 [project.optional-dependencies]
