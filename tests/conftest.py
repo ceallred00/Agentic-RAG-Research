@@ -5,11 +5,13 @@ from unittest.mock import patch, MagicMock
 from pydantic import SecretStr
 from pathlib import Path
 from langchain_core.documents import Document
+from pinecone.core.openapi.inference.model.sparse_embedding import SparseEmbedding
 
-from src.schemas.agent_schemas import AgentConfig
-from src.core.execution_service import ExecutionService
-from src.knowledge_base.ingestion.pdf_to_markdown_converter import PDFToMarkdownConverter
-from src.knowledge_base.processing.text_chunker import TextChunker
+
+from schemas.agent_schemas import AgentConfig
+from core.execution_service import ExecutionService
+from knowledge_base.ingestion.pdf_to_markdown_converter import PDFToMarkdownConverter
+from knowledge_base.processing.text_chunker import TextChunker
 
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
@@ -159,26 +161,53 @@ def text_chunk_with_metadata():
     return [text_chunk]
 
 @pytest.fixture
-def dense_embeddings():
+def example_test_chunk_from_handbook():
+    return [Document(metadata={'Header 1': 'THE DEPARTMENT OF MATHEMATICS AND STATISTICS', 'Header 2': 'Departmental Program Requirements', 'source': 'Graduate Student Handbook 2024 2025', 'id': 'graduate_student_handbook_2024_2025_chunk_51'}, page_content='Context: Source: Graduate Student Handbook 2024 2025 > THE DEPARTMENT OF MATHEMATICS AND STATISTICS > Departmental Program Requirements\n---\n## Departmental Program Requirements  \nTo earn your Advanced Data Science Graduate Certificate online through UWF, you will complete a total of nine credit hours. The program consists of three required courses that provide specialized skills, leading to career advancement opportunities across various fields.')]
+
+@pytest.fixture
+def raw_dense_embeddings():
     """
     Returns a list containing a single dense vector embedding (list of floats).
     Matches the structure expected by the upsert function (List[List[float]]).
     """
-    return [[0.1, 0.2, 0.3]]
+    return [[2.0, 4.0, 4.0, 8.0]]
 
 @pytest.fixture
-def sparse_embeddings():
+def normalized_dense_embeddings():
     """
-    Returns a list containing a single Mock object representing a sparse embedding.
-    The mock object has 'sparse_indices' and 'sparse_values' attributes.
+    Returns a list containing a single normalized dense vector embedding (list of floats).
     """
-    sparse_mock = MagicMock()
-    # Indices must be integers, values must be floats
-    sparse_mock.sparse_indices = [1, 5]
-    sparse_mock.sparse_values = [0.9, 0.8]
+    return [[0.2, 0.4, 0.4, 0.8]]
 
-    # Must be returned as a list to allow zipping with chunks and dense embeddings
-    return [sparse_mock]
+@pytest.fixture
+def raw_sparse_embeddings():
+    """
+    Returns a list containing a real SparseEmbedding object.
+    Using the real class ensures we validate proper data types and attribute names.
+    """
+    # Create the actual object
+    # Note: Pinecone's SparseEmbedding usually expects 'indices' and 'values'
+    # Check your specific SDK version if it requires 'sparse_indices' instead.
+    embedding = SparseEmbedding(
+        sparse_values=[1.0, 5.0, 5.0, 7.0], 
+        sparse_indices=[744372458, 2165993515, 3261080123, 3508911095], 
+        vector_type="sparse"
+    )
+
+    return [embedding]
+
+@pytest.fixture
+def normalized_sparse_embeddings():
+    """
+    Returns a list containing a normalized SparseEmbedding object.
+    """
+    embedding = SparseEmbedding(
+        sparse_values = [0.1, 0.5, 0.5, 0.7],
+        sparse_indices = [744372458, 2165993515, 3261080123, 3508911095],
+        vector_type = "sparse"  
+    )
+
+    return [embedding]
 
 @pytest.fixture
 def expected_record():
@@ -194,10 +223,10 @@ def expected_record():
     """
     return [{
         'id': 'hello_world_chunk_1',
-        'values': [0.1, 0.2, 0.3],
+        'values': [0.2, 0.4, 0.4, 0.8],
         'sparse_values': {
-            'indices': [1,5],
-            'values': [0.9, 0.8]
+            'indices': [744372458, 2165993515, 3261080123, 3508911095],
+            'values': [0.1, 0.5, 0.5, 0.7]
         },
         'metadata': {
             'text': "Context: Source: hello world > Test > Test Test\n---\nHello World",
@@ -278,27 +307,36 @@ def pinecone_api_key_env(monkeypatch):
 
 @pytest.fixture
 def mock_gemini_client():
-    with patch("src.core.execution_service.ChatGoogleGenerativeAI") as MockClient:
+    with patch("core.execution_service.ChatGoogleGenerativeAI") as MockClient:
         yield MockClient
 
 @pytest.fixture
 def mock_gemini_dense_embedding_client():
-    with patch("src.core.execution_service.GoogleGenerativeAIEmbeddings") as MockEmbeddingClient:
+    with patch("core.execution_service.GoogleGenerativeAIEmbeddings") as MockEmbeddingClient:
         yield MockEmbeddingClient
 
 @pytest.fixture
 def mock_pinecone_client():
-    with patch("src.core.execution_service.Pinecone") as MockPineconeClient:
+    with patch("core.execution_service.Pinecone") as MockPineconeClient:
         yield MockPineconeClient
 
 @pytest.fixture
 def mock_docling_loader():
-    with patch("src.knowledge_base.ingestion.pdf_to_markdown_converter.DoclingLoader") as MockDoclingLoader:
+    with patch("knowledge_base.ingestion.pdf_to_markdown_converter.DoclingLoader") as MockDoclingLoader:
         yield MockDoclingLoader
 
 @pytest.fixture
 def mock_index_object():
     return MagicMock()
+
+@pytest.fixture
+def mock_vector_normalizer():
+    """Patches VectorNormalizer to return data unchanged and avoid math errors."""
+    with patch("knowledge_base.processing.vector_normalizer") as mock:
+        # Configure normalize to just return the first argument (identity)
+        mock.normalize.side_effect = lambda vectors, vector_type: "DENSE"
+        yield mock
+
 
 # ==============================================================================
 # 4. SERVICE INSTANCES

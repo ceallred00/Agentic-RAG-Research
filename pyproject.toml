@@ -49,3 +49,7 @@ max-line-length = 88
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.pytest.ini_options]
+pythonpath = "src"
+testpaths = ["tests"]

@@ -1,6 +1,7 @@
 import logging
 from core.execution_service import ExecutionService
 from knowledge_base.processing.text_chunker import TextChunker
+from knowledge_base.processing.vector_normalizer import VectorNormalizer, VectorType
 from pinecone.core.openapi.inference.model.sparse_embedding import SparseEmbedding
 from pathlib import Path
 from constants import PROCESSED_DATA_DIR, PINECONE_MAX_BATCH_SIZE
@@ -23,15 +24,18 @@ class PineconeSparseEmbedder:
 
     def embed_KB_document_sparse(self, inputs: Union[List[Document], List[str]]) -> List[SparseEmbedding]:
         """
-        Generates sparse embeddings for knowledge base documents.
+        Generates normalized sparse embeddings for knowledge base documents.
         """
-        return self._create_embeddings(task_type = "passage", inputs=inputs)
+        raw_embeddings = self._create_embeddings(task_type = "passage", inputs=inputs)
+        return VectorNormalizer.normalize(raw_embeddings, VectorType.SPARSE) #type:ignore
+    
     def embed_sparse_query(self, user_query:str) -> List[SparseEmbedding]:
         """
-        Generates sparse embeddings for a user's search query.
+        Generates a normalized sparse embeddings for a user's search query.
         """
 
-        return self._create_embeddings(task_type = "query", inputs=[user_query])
+        raw_embeddings = self._create_embeddings(task_type = "query", inputs=[user_query])
+        return VectorNormalizer.normalize(raw_embeddings, VectorType.SPARSE) #type: ignore
 
     def _create_embeddings(self, 
                            task_type: Literal["query", "passage"], 
@@ -93,20 +97,22 @@ if __name__ == "__main__": # pragma: no cover
                 markdown_content = f.read()
             
             chunker = TextChunker()
-            chunks = chunker.split_text(markdown_content)
+            chunks = chunker.split_text(markdown_content, "Graduate-Student-Handbook-2024-2025.md")
             
-            # Test with just 2 chunks to verify small batch logic works now
-            small_test_chunks = chunks[:2]
+            # Test with 1 chunk to verify small batch logic works now
+            small_test_chunks = chunks[50:51]
+            print(small_test_chunks)
             embeddings = embedder.embed_KB_document_sparse(small_test_chunks)
             
             print(f"\nSuccess! Generated {len(embeddings)} embeddings.")
             if embeddings:
                 print(f"Embeddings Type: {type(embeddings)}")
                 print(embeddings)
-                first_emb = embeddings[0]
-                print(f"First Embedding Type: {type(first_emb)}")
+                first_emb = embeddings[0] 
+                print(f"First Embedding Type: {type(first_emb)}") # Expected Type:  <class 'pinecone.core.openapi.inference.model.sparse_embedding.SparseEmbedding'>
                 print(f"First Embedding Content Preview: {first_emb}")
-                print(f"First Embedding: {first_emb.sparse_values}")
+                print(len(first_emb.sparse_values))
+                print(len(first_emb.sparse_indices))
 
     except Exception as e:
         logger.error(f"Test run failed: {e}")

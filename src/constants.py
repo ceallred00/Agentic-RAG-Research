@@ -30,6 +30,8 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 # Limit: 2048 tokens. 
     # Ref: https://ai.google.dev/gemini-api/docs/embeddings?authuser=1#model-versions
 GEMINI_EMBEDDING_MAX_CHAR_LIMIT = 8000
+# Doc Ref: https://reference.langchain.com/python/integrations/langchain_google_genai/GoogleGenerativeAIEmbeddings/#langchain_google_genai.GoogleGenerativeAIEmbeddings.output_dimensionality
+GEMINI_EMBEDDING_BATCH_LIMIT = 100
 
 # Model: pinecone-sparse-english-v0
 # Limit: 2048 tokens.
@@ -38,7 +40,7 @@ PINECONE_EMBEDDING_MAX_CHAR_LIMIT = 8000
 PINECONE_MAX_BATCH_SIZE = 96
 # Max batch size for upserts to Pinecone index to avoid request size limits (2 MB).
     # Ref: https://docs.pinecone.io/guides/index-data/upsert-data
-# Vectors are heavy on size due to text in metadata and spare representation. 
+# Vectors are heavy on size due to text in metadata and sparse representation. 
 PINECONE_UPSERT_MAX_BATCH_SIZE = 50
 
 # --- Chunking Strategies ---

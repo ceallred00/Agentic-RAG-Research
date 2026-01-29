@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.knowledge_base.vector_db.create_vector_db_index import create_vector_db_index
+from knowledge_base.vector_db.create_vector_db_index import create_vector_db_index
 
 class TestCreateVectorDbIndex:
     """Unit tests for the create_vector_db_index function"""
-    @patch("src.knowledge_base.vector_db.create_vector_db_index.ServerlessSpec")
+    @patch("knowledge_base.vector_db.create_vector_db_index.ServerlessSpec")
     def test_successful_db_creation(self, MockServerlessSpec, mock_pinecone_client, mock_index_object):
         """
         Verifies that the function initializes the ServerlessSpec correctly, 

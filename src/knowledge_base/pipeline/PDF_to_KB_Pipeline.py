@@ -69,7 +69,6 @@ def PDF_to_KB_Pipeline(pdf_file_names: List[str], kb_name: str):
     for chunk in all_chunks[:10]:
         print(f"Metadata: {chunk.metadata}\nContent Preview: {chunk.page_content[:400]}\n---\n")
 
-    # Create dense embeddings for the text chunks.
     dense_embeddings = gemini_embedder.embed_KB_document_dense(document=all_chunks)
     if dense_embeddings:
         logger.info(f"Generated {len(dense_embeddings)} dense embeddings for KB: {kb_name}")

@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from langchain_core.documents import Document
-from src.knowledge_base.vector_db.upsert_to_vector_db import upsert_to_vector_db
+from knowledge_base.vector_db.upsert_to_vector_db import upsert_to_vector_db
 
 class TestUpsertToVectorDb:
     """Unit tests for the upsert_to_vector_db function."""
-    def test_successful_upsert_to_vector_db(self, mock_pinecone_client, mock_index_object, text_chunk_with_metadata, dense_embeddings, sparse_embeddings, expected_record):
+    def test_successful_upsert_to_vector_db(self, mock_pinecone_client, mock_index_object, text_chunk_with_metadata, normalized_dense_embeddings, normalized_sparse_embeddings, expected_record):
         """
         Verifies the 'Happy Path' where inputs are valid and the upsert succeeds.
 
@@ -21,14 +21,14 @@ class TestUpsertToVectorDb:
             pinecone_client = mock_pinecone_client, 
             index_name = "fake_index_name", 
             text_chunks = text_chunk_with_metadata, 
-            dense_embeddings = dense_embeddings, 
-            sparse_embeddings = sparse_embeddings)
+            dense_embeddings = normalized_dense_embeddings, 
+            sparse_embeddings = normalized_sparse_embeddings)
         
         mock_pinecone_client.Index.assert_called_once_with("fake_index_name")
 
         mock_index_object.upsert.assert_called_once_with(vectors = expected_record)
 
-    def test_index_connection_exception(self, mock_pinecone_client, text_chunk_with_metadata, dense_embeddings, sparse_embeddings):
+    def test_index_connection_exception(self, mock_pinecone_client, text_chunk_with_metadata, normalized_dense_embeddings, normalized_sparse_embeddings):
         """
         Verifies that if the client fails to connect to the Index (e.g., index not found 
         or network error), the function raises the exception immediately before 
@@ -41,12 +41,12 @@ class TestUpsertToVectorDb:
                 pinecone_client = mock_pinecone_client, 
                 index_name = "fake_index_name", 
                 text_chunks = text_chunk_with_metadata, 
-                dense_embeddings = dense_embeddings, 
-                sparse_embeddings = sparse_embeddings)
+                dense_embeddings = normalized_dense_embeddings, 
+                sparse_embeddings = normalized_sparse_embeddings)
             
         assert "Error connecting to index" in str(exc_info.value)
 
-    def test_upsert_exception(self, mock_pinecone_client, mock_index_object, text_chunk_with_metadata, dense_embeddings, sparse_embeddings):
+    def test_upsert_exception(self, mock_pinecone_client, mock_index_object, text_chunk_with_metadata, normalized_dense_embeddings, normalized_sparse_embeddings):
         """
         Verifies that runtime errors occurring during the actual batch upload 
         (inside the loop) are caught, logged, and re-raised to the caller.
@@ -59,11 +59,11 @@ class TestUpsertToVectorDb:
                 pinecone_client = mock_pinecone_client, 
                 index_name = "fake_index_name", 
                 text_chunks = text_chunk_with_metadata, 
-                dense_embeddings = dense_embeddings, 
-                sparse_embeddings = sparse_embeddings)
+                dense_embeddings = normalized_dense_embeddings, 
+                sparse_embeddings = normalized_sparse_embeddings)
             
         assert "Error upserting batch" in str(exc_info.value)
-    @patch("src.knowledge_base.vector_db.upsert_to_vector_db.PINECONE_UPSERT_MAX_BATCH_SIZE", 2)
+    @patch("knowledge_base.vector_db.upsert_to_vector_db.PINECONE_UPSERT_MAX_BATCH_SIZE", 2)
     def test_batches_large_payloads(self, mock_pinecone_client, mock_index_object):
         """
         Verifies that large payloads are split into smaller batches.

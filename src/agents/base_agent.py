@@ -114,7 +114,7 @@ tools = [search_web, perform_rag_tool, draft_email, send_email, search_for_advis
 # model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
 
 # model = ChatOpenAI(model = "openai/gpt-4", api_key = SecretStr(os.getenv("EDEN_AI_API_KEY")), base_url = "https://api.edenai.run/v3/llm", streaming = True).bind_tools(tools)
-model = execution_service.get_eden_ai_client().bind_tools(tools)
+model = execution_service.get_eden_ai_client(model_name="openai/gpt-5").bind_tools(tools)
 
 def base_agent(state: AgentState) -> AgentState: #type:ignore
     """

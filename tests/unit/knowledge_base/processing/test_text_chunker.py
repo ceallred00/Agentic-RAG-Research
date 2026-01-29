@@ -46,7 +46,7 @@ class TestTextChunker:
         
         def test_exception_header_splits(self, text_chunker, valid_md_file_content):
             """Verify that the method returns the original text if the underlying splitter crashes."""
-            path_to_patch = "src.knowledge_base.processing.text_chunker.MarkdownHeaderTextSplitter"
+            path_to_patch = "knowledge_base.processing.text_chunker.MarkdownHeaderTextSplitter"
 
             # Mock the splitter to crash
             with patch(path_to_patch, side_effect = Exception("Parsing error")):
