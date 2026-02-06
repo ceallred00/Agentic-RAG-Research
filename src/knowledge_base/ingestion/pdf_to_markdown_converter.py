@@ -49,7 +49,7 @@ class PDFToMarkdownConverter:
             logger.error(error_msg, exc_info=True)
             raise RuntimeError(error_msg) from e
 
-        
+    #TODO: Remove redundant function and fix tests + implementations in the PDF_to_KB_Pipeline
     def save_markdown_file(self, content: str, output_filename: str):
         """
         Saves the provided markdown content to a file.

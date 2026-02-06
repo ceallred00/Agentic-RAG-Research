@@ -20,6 +20,7 @@ PROD_DIAGRAM_DIR = BASE_DIAGRAM_DIR / "production"
 DATA_DIR = ROOT_DIR/ "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+UWF_PUBLIC_KB_PROCESSED_DATE_DIR = PROCESSED_DATA_DIR / "uwf_public_kb"
 
 # --- Embedding Model Constraints ---
 # Token Approximation: 1 token ~= 4 chars. 2048 * 4 = 8192 chars.
@@ -55,3 +56,6 @@ FAKE_DEPARTMENT_ADVISORS = {
     "Biology": {"name": "Dr. Lee", "email": "sarah.lee@uwf.edu"},
     "History": {"name": "Dr. Brown", "email": "michael.brown@uwf.edu"}
 }
+
+UWF_CONFLUENCE_PAGE_SPACE = "public"
+UWF_CONFLUENCE_BASE_URL = "https://confluence.uwf.edu"

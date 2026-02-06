@@ -12,19 +12,27 @@ authors = [
 requires-python = ">=3.11, <3.13"
 
 dependencies = [
-    "langchain~=1.2.0",
-    "langgraph~=1.0.5",
-    "langchain-google-genai~=4.2",
-    "python-dotenv>=1.2.1",
-    "pydantic>=2.0.0",
-    "PyYAML>=6.0",
-    "langchain-docling>=2.0.0",
-    "langchain-text-splitters>=1.1.0",
-    "langchain-pinecone>=0.2.13",
-    "pinecone>=7.3.0",
-    "langchain-openai>=1.1.7",
-    "opencv-python>=4.13",
-    "numpy>2.0.0"
+    # --- Orchestration & Frameworks ---
+    "langchain~=1.2.0",               # Core framework for building agentic applications
+    "langgraph~=1.0.5",               # Graph-based orchestration for multi-agent workflows
+    "pydantic>=2.0.0",                # Data validation and settings management (Schema definition)
+    "python-dotenv>=1.2.1",           # Loads environment variables (API keys) from .env files
+    "PyYAML>=6.0",                    # Parsing YAML configuration files (Agent configs)
+
+    # --- AI Models & Providers ---
+    "langchain-google-genai~=4.2",    # Interface for Google Gemini models
+    "langchain-openai>=1.1.7",        # Interface for OpenAI GPT models + EdenAI models
+    
+    # --- Vector Database & Embeddings ---
+    "pinecone>=7.3.0",                # Pinecone Vector Database client + Pinecone sparse embedding model
+    "langchain-pinecone>=0.2.13",     # LangChain integration for Pinecone
+    "langchain-text-splitters>=1.1.0",# Tools for chunking text for embedding
+    "numpy>2.0.0",                    # Used for normalizing vector embeddings
+
+    # --- Document Processing & Ingestion ---
+    "langchain-docling>=2.0.0",       # PDF parsing for KB
+    "opencv-python>=4.13",            
+    "requests>=2.32.5",               # HTTP client for API calls (Confluence page tree scraping)
 ]
 
 [project.optional-dependencies]

@@ -11,6 +11,9 @@ from pinecone.core.openapi.inference.model.sparse_embedding import SparseEmbeddi
 from schemas.agent_schemas import AgentConfig
 from core.execution_service import ExecutionService
 from knowledge_base.ingestion.pdf_to_markdown_converter import PDFToMarkdownConverter
+from knowledge_base.ingestion.confluence_content_extractor import ConfluenceContentExtractor
+from knowledge_base.ingestion.confluence_page_processor import ConfluencePageProcessor
+from knowledge_base.ingestion.url_to_md_converter import URLtoMarkdownConverter
 from knowledge_base.processing.text_chunker import TextChunker
 
 # ==============================================================================
@@ -244,6 +247,42 @@ def sample_agent_configs_objects(sample_agent_config_dict):
         for name, config in sample_agent_config_dict.items()
     }
 
+@pytest.fixture
+def sample_url():
+    return "https://mock.uwf.edu"
+
+@pytest.fixture
+def sample_confluence_page_json():
+    """Realistic single page object from Confluence API"""
+    return {
+            "id": "12345",
+            "title": "Advising Syllabus",
+            "type": "page",
+            "status": "current",
+            "body": {
+                "storage": { "value": "<p>Raw HTML content...</p>" }
+            },
+            "version": {
+                "number": 2,
+                "when": "2023-11-27T12:05:17.897-06:00"
+            }, 
+            "_links": {
+                "self": "https://confluence.uwf.edu/rest/api/content/12345",
+                "webui": "/display/SPACE/Advising+Syllabus"
+            }
+        }
+
+@pytest.fixture
+def sample_space_key():
+    return "test"
+
+@pytest.fixture
+def sample_ancestors(sample_parent_id):
+    return [{"id": sample_parent_id, "title": "UWF Public Knowledge Base"}]
+
+@pytest.fixture
+def sample_parent_id():
+    return "7641671"
 
 # ==============================================================================
 # 2. ENVIRONMENT & FILESYSTEM
@@ -369,3 +408,21 @@ def pdf_converter(valid_raw_data_dir, valid_processed_data_dir):
 def text_chunker():
     """Returns a TextChunker instance with small chunk sizes for easier testing."""
     return TextChunker(chunk_size = 50, chunk_overlap = 10)
+
+@pytest.fixture
+def url_converter(valid_processed_data_dir, sample_url):
+    """Creates an instance of URLtoMarkdownConverter with valid paths."""
+    converter = URLtoMarkdownConverter(base_url = sample_url, saved_data_path = valid_processed_data_dir)
+    converter.session = MagicMock() # Replace the real requests.Session with a MagicMock
+    return converter
+
+@pytest.fixture
+def confluence_processor(valid_processed_data_dir):
+    processor = ConfluencePageProcessor(saved_data_path = valid_processed_data_dir)
+    processor.file_saver = MagicMock()
+    processor.content_extractor = MagicMock()
+    return processor
+
+@pytest.fixture
+def confluence_html_extractor():
+    return ConfluenceContentExtractor()
