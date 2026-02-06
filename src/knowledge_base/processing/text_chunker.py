@@ -1,8 +1,9 @@
 import logging
 import hashlib
+import frontmatter
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from constants import PROCESSED_DATA_DIR, CHUNKING_SIZE, CHUNKING_OVERLAP
 from pathlib import Path
 
@@ -10,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 class TextChunker:
     """
-    Handles the splitting of text document into smaller chunks for embedding.
+    Handles splitting of text into chunks, supporting both:
+    1. Scraped Markdown (with YAML frontmatter for hierarchy/url).
+    2. PDF/Raw Markdown (uses filename for source context).
     
     This class prioritizies semantic boundaries by first splitting on Markdown headers,
     and then recursively splitting larger sections to fit context windows.
@@ -42,9 +45,10 @@ class TextChunker:
         Primary entry point: Takes raw markdown text and returns fully processed chunks.
 
         Pipeline:
-            1. Split by Markdown Headers (preserves structural context).
-            2. Split larger sections by Character count (preserves token limits).
-            3. Inject metadata back into the text content so the vector "sees" it.
+            1. Detects if text has YAML metadata or is raw text.
+            2. Split by Markdown Headers (preserves structural context).
+            3. Split larger sections by Character count (preserves token limits).
+            4. Inject metadata back into the text content so the vector "sees" it.
         
         Args:
             text (str): The raw markdown text to be chunked.
@@ -61,12 +65,17 @@ class TextChunker:
         """
 
         try:
-            header_splits = self._split_on_headers(text)
+            logger.info("Starting text chunking...")
+            # Parse YAML metadata. 
+            post = frontmatter.loads(text) # Plain text returns empty metadata
+            clean_text = post.content
+            file_metadata = post.metadata # Dict of YAML keys (if any)
+
+            header_splits = self._split_on_headers(clean_text)
             recursive_chunks = self._split_recursive(header_splits) # Smaller context window
-            final_chunks = self._enrich_metadata(recursive_chunks, source_name)
+            final_chunks = self._enrich_metadata(recursive_chunks, file_metadata, source_name)
             
             logger.info(f"Successfully split text into {len(final_chunks)} chunks.")
-            
             return final_chunks
 
         except Exception as e:
@@ -116,7 +125,7 @@ class TextChunker:
 
         return text_splitter.split_documents(documents)
         
-    def _enrich_metadata(self, documents: List[Document], source_name: Optional[str] = None) -> List[Document]:
+    def _enrich_metadata(self, documents: List[Document], yaml_meta: Dict, source_name: Optional[str] = None) -> List[Document]:
         """
         Iterates through chunks to:
         1. Inject header hierarchy into the content (Context).
@@ -135,6 +144,13 @@ class TextChunker:
             List[Document]: The enriched documents with updated metadata and content.
         """
         enriched_docs = []
+
+        #TODO: Finish here
+        if yaml_meta:
+            source_title = yaml_meta.get('title', 'Unknown Title')
+            source_parent = yaml_meta.get('parent', 'Unknown Parent')
+            source_url = yaml_meta.get('url', None)
+
         
         # Create a human-readable source name if provided.
         readable_source = ""
