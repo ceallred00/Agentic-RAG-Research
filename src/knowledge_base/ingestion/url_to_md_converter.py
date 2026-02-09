@@ -6,6 +6,8 @@ from knowledge_base.ingestion.confluence_page_processor import ConfluencePagePro
 from constants import UWF_PUBLIC_KB_PROCESSED_DATE_DIR, UWF_CONFLUENCE_BASE_URL
 from pathlib import Path
 
+# For main entry point
+from core.logging_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -233,9 +235,10 @@ class URLtoMarkdownConverter:
     
     
 if __name__ == "__main__": # pragma: no cover
-    id = "7641671"
-    res = URLtoMarkdownConverter()._fetch_immediate_children(id)
+    setup_logging()
 
-    print(len(res))
-    print(res[0:2])
+    converter = URLtoMarkdownConverter(base_url = UWF_CONFLUENCE_BASE_URL, saved_data_path =  UWF_PUBLIC_KB_PROCESSED_DATE_DIR)
+
+    converter.scrape_tree(7641671)
+
 

@@ -1,4 +1,5 @@
 import logging
+import regex as re
 from knowledge_base.ingestion.confluence_content_extractor import ConfluenceContentExtractor
 from knowledge_base.ingestion.file_saver import FileSaver
 from pathlib import Path
@@ -61,6 +62,12 @@ class ConfluencePageProcessor:
             return
         
         cleaned_markdown = self.content_extractor.extract(raw_html, base_url = base_url, space_key = current_space)
+
+        # Matches: [>]]>](ANY_URL)
+        cleaned_markdown = re.sub(r'\[>\]\]>\]\(.*?\)', '', cleaned_markdown)
+
+        # Strip leftover XML/HTML artifacts (CDATA tags)
+        cleaned_markdown = cleaned_markdown.replace("]]>", "")
 
         path_string = " / ".join([a['title'] for a in ancestors])
 

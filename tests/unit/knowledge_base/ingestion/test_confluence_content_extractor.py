@@ -189,7 +189,7 @@ class TestConfluenceContentExtractor:
 
             # Handles special characters
             # quote_plus uses ASCII URL Encoding - & becomes 26
-            assert f"{sample_url}/display/{test}/Q%26A" in result
+            assert f"{sample_url}/display/{sample_space_key}/Q%26A" in result
 
 
 
