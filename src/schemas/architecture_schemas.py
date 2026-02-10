@@ -1,1 +1,1 @@
-""" Defines Pydantic models for architecture configurations. """
+"""Defines Pydantic models for architecture configurations."""

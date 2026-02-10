@@ -1,10 +1,10 @@
 """
-This module is the working code for a base agent. 
+This module is the working code for a base agent.
 
-Note that it is not the final version of the agent; rather, it is an in-progress version. 
+Note that it is not the final version of the agent; rather, it is an in-progress version.
 
 Future iterations will include:
-- Moving the tools into their own respective files and directories. 
+- Moving the tools into their own respective files and directories.
 - Moving the system prompt to the base_agent.yaml file.
 - The graph configuration may get exported to the architecture YAML files, though that is to be decided at a later date.
 
@@ -31,7 +31,6 @@ from utils.process_events import process_events
 from tools.perform_rag_tool import get_perform_rag_tool
 from constants import FAKE_DEPARTMENT_ADVISORS
 
-
 # from utils.architecture_diagram_generator import ArchitectureDiagramGenerator
 # from constants import PROD_DIAGRAM_DIR
 
@@ -40,9 +39,10 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 execution_service = ExecutionService()
-perform_rag_tool = get_perform_rag_tool(execution_service, index_name = "university-handbook-kb")
+perform_rag_tool = get_perform_rag_tool(execution_service, index_name="university-handbook-kb")
 
 # TODO: Move tools to their own .py files and finalize.
+
 
 @tool
 def search_web(query: str):
@@ -51,64 +51,84 @@ def search_web(query: str):
     """
     return f"Web search results for query: {query}"  # Example response
 
+
 @tool
-def draft_email(user_input: str, advisor_email: str, advisor_name: str, student_name: str, student_email: str):
-    """ 
-    Draft an email based on user input. This email will be used to communicate with the advisor. 
-    The email should include the name of the student, the student's email address,the advisor's name, and a brief summary of the user's query. 
+def draft_email(
+    user_input: str,
+    advisor_email: str,
+    advisor_name: str,
+    student_name: str,
+    student_email: str,
+):
+    """
+    Draft an email based on user input. This email will be used to communicate with the advisor.
+    The email should include the name of the student, the student's email address,the advisor's name, and a brief summary of the user's query.
     The tone should be professional and courteous.
-    
+
     This tool call should follow a call to search_for_advisor, which will help in identifying the advisor's email address and name.
 
     This tool call should be performed only if explicitly requested by the user, or if the user is not satisfied with the information provided by the RAG process or the web search.
 
     Once the email is drafted, return it to the user for review.
     """
-    #TODO: Implement the email response structure
+    # TODO: Implement the email response structure
     pass
+
 
 @tool
 def send_email(email_content: str):
-    """ 
-    Send an email with the drafted content. 
-    
+    """
+    Send an email with the drafted content.
+
     This tool call should follow a call to draft_email, only after the user has reviewed and approved the draft.
-    The email should be sent to the advisor's email address, as identified using the search_for_advisor tool."""
+    The email should be sent to the advisor's email address, as identified using the search_for_advisor tool.
+    """
 
     pass
+
 
 @tool
 def search_for_advisor(department: str):
     """
     Retrieves advisor contact details for a specific UWF department.
-    
+
     If the department is not specified, you should prompt the user for their department.
     Once the advisor is found, return the email address of the advisor to the user.
     Then, ask the user if they would like you to draft and send an email to the advisor for further assistance.
-    
-    If the user agrees, draft an email using the draft_email tool. 
+
+    If the user agrees, draft an email using the draft_email tool.
     """
     advisor_lookup = {key.lower(): value for key, value in FAKE_DEPARTMENT_ADVISORS.items()}
 
     advisor_info = advisor_lookup.get(department.lower())
-    
-    if not advisor_info: 
-        return "I'm sorry, I couldn't find an advisor for that department. Please check the department name and try again."
+
+    if not advisor_info:
+        return (
+            "I'm sorry, I couldn't find an advisor for that department. Please check the department name and try again."
+        )
 
     return f"Advisor found. Your advisor is {advisor_info['name']} at {advisor_info['email']}."  # Example response
 
+
 @tool
 def end_conversation() -> str:
-    """ 
-    Closes the active session. 
-    
+    """
+    Closes the active session.
+
     Call this when the user says goodbye, indicates they are satisfied, or has no further questions.
     """
     return "Conversation ended"  # Example response
 
 
 # Register the available tools
-tools = [search_web, perform_rag_tool, draft_email, send_email, search_for_advisor, end_conversation]
+tools = [
+    search_web,
+    perform_rag_tool,
+    draft_email,
+    send_email,
+    search_for_advisor,
+    end_conversation,
+]
 
 # Initialize the model with the available tools
 # model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", include_thoughts=True).bind_tools(tools) # Bind available tools to the model
@@ -116,11 +136,12 @@ tools = [search_web, perform_rag_tool, draft_email, send_email, search_for_advis
 # model = ChatOpenAI(model = "openai/gpt-4", api_key = SecretStr(os.getenv("EDEN_AI_API_KEY")), base_url = "https://api.edenai.run/v3/llm", streaming = True).bind_tools(tools)
 model = execution_service.get_eden_ai_client(model_name="openai/gpt-5").bind_tools(tools)
 
-def base_agent(state: AgentState) -> AgentState: #type:ignore
+
+def base_agent(state: AgentState) -> AgentState:  # type: ignore
     """
     Main decision-making node.
     """
-    system_prompt = SystemMessage(content = f"""
+    system_prompt = SystemMessage(content=f"""
         You are the UWF Student Assistant, a helpful AI dedicated to University of West Florida students.
 
         CORE WORKFLOW:
@@ -159,7 +180,7 @@ def base_agent(state: AgentState) -> AgentState: #type:ignore
             # Generate a response using the model
             response = model.invoke(messages)
             logger.info("Invoking model...")
-            
+
             # Update the state by returning the old messages + the new user message + the new AI response
             return {"messages": [response]}
         except ServerError as e:
@@ -169,25 +190,28 @@ def base_agent(state: AgentState) -> AgentState: #type:ignore
 
 
 def should_continue(state: AgentState):
-    """ 
+    """
     Conditional function to determine if the graph should continue or end.
     """
     messages = state["messages"]
     last_message = messages[-1]
-    if isinstance(last_message, AIMessage) and not last_message.tool_calls: # Look at last message to see if there are any tool calls. If not, end the graph.
-        return "end" # Edge
-    else: # If there are tool calls, continue the graph.
-        return "continue" # Edge
+    if (
+        isinstance(last_message, AIMessage) and not last_message.tool_calls
+    ):  # Look at last message to see if there are any tool calls. If not, end the graph.
+        return "end"  # Edge
+    else:  # If there are tool calls, continue the graph.
+        return "continue"  # Edge
 
-    
+
 def print_messages(messages):
-    """ Print the message in a more readable format."""
+    """Print the message in a more readable format."""
     if not messages:
         return
-    
+
     for message in messages[-3:]:
         if isinstance(message, ToolMessage):
             print(f"\n TOOL RESULT: {message.content}")
+
 
 graph = StateGraph(AgentState)
 graph.add_node("base_agent", base_agent)
@@ -195,13 +219,9 @@ graph.add_node("tool_node", ToolNode(tools))
 
 graph.set_entry_point("base_agent")
 graph.add_conditional_edges(
-    source = "base_agent", 
-    path = should_continue,
-    path_map = {
-        "continue": "tool_node",
-        "end": END
-    
-    }
+    source="base_agent",
+    path=should_continue,
+    path_map={"continue": "tool_node", "end": END},
 )
 graph.add_edge("tool_node", "base_agent")
 
@@ -218,9 +238,9 @@ def run():
 
     The graph is invoked when the user provides input.
     The graph will execute according to its architecture.
-     
+
     The conversation continues until the user decides to exit, meaning that the graph may be invoked several times depending on the user's input.
-    
+
     """
     print("\n The AI Assistant is ready to help you. Type 'exit' to end the conversation.")
     # A static thread_id simulates a persistent user session.
@@ -232,15 +252,17 @@ def run():
     # current_state.values is a dictionary.
     if not current_state.values or not current_state.values.get("messages"):
         # Kickstart AI
-        events = application_streamer(application=app,
-                                      user_input = "Hello!", 
-                                      configuration = config, 
-                                      stream_mode = "updates")
-        
-        process_events(events = events, thinking_flag = False)
+        events = application_streamer(
+            application=app,
+            user_input="Hello!",
+            configuration=config,
+            stream_mode="updates",
+        )
+
+        process_events(events=events, thinking_flag=False)
 
     while True:
-        try: 
+        try:
             user_input = input("\nUser: ")
             if user_input.lower() in ["exit", "quit"]:
                 print("Exiting the conversation.")
@@ -251,16 +273,17 @@ def run():
 
         # Runs the graph one node at a time, streaming intermediate state.
         events = application_streamer(
-            application = app, 
-            user_input = user_input, 
-            configuration = config, 
-            stream_mode = "updates"
+            application=app,
+            user_input=user_input,
+            configuration=config,
+            stream_mode="updates",
         )
 
-        process_events(events = events, thinking_flag = True)
+        process_events(events=events, thinking_flag=True)
+
 
 # base_agent_diagram = ArchitectureDiagramGenerator(PROD_DIAGRAM_DIR)
 # base_agent_diagram.generate_graph_diagram("base_agent_v1.png", app)
-    
+
 if __name__ == "__main__":
     run()

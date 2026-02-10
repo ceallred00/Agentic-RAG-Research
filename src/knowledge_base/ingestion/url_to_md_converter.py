@@ -11,6 +11,7 @@ from core.logging_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
+
 class URLtoMarkdownConverter:
     """
     Recursively scrapes a Confluence page tree via JSON API.
@@ -20,7 +21,12 @@ class URLtoMarkdownConverter:
     3. Delegate processing to the PageProcessor
     4. Save markdown files.
     """
-    def __init__(self, base_url: str = UWF_CONFLUENCE_BASE_URL, saved_data_path: Union[str, Path] = UWF_PUBLIC_KB_PROCESSED_DATE_DIR):
+
+    def __init__(
+        self,
+        base_url: str = UWF_CONFLUENCE_BASE_URL,
+        saved_data_path: Union[str, Path] = UWF_PUBLIC_KB_PROCESSED_DATE_DIR,
+    ):
         """
         Initializes the converter with API session settings and processing tools.
 
@@ -33,15 +39,13 @@ class URLtoMarkdownConverter:
 
         # body.storage returns the raw HTML from the Confluence API - not including website HTML
         # body.version returns the version number and information about the last modification made to the page.
-        self.params = {
-            'expand': "body.storage,version"
-        }
-        
+        self.params = {"expand": "body.storage,version"}
+
         self.visited_ids: Set[str] = set()
-        
-        self.session = requests.Session() # Setup persistent session
+
+        self.session = requests.Session()  # Setup persistent session
         self.session.headers.update({"Accept": "application/json"})
-    
+
     def scrape_tree(self, root_id: Union[int, str]):
         """
         The entry point for the scraping process. Fetches the root page and initiates recursion.
@@ -55,7 +59,7 @@ class URLtoMarkdownConverter:
 
         Args:
             root_id (Union[int, str]): The ID of the page where scraping begins.
-        
+
         Returns:
             None
         """
@@ -65,22 +69,22 @@ class URLtoMarkdownConverter:
         root_data = self._api_request(url, root_id)
 
         if root_data:
-            title = root_data.get('title', 'ROOT')
+            title = root_data.get("title", "ROOT")
 
             # Root page has no ancestors
             initial_ancestors = []
 
             self.processor.process_page(
-                child_data = root_data,
-                ancestors = initial_ancestors,
-                base_url = self.base_url
+                child_data=root_data,
+                ancestors=initial_ancestors,
+                base_url=self.base_url,
             )
 
             logger.info(f"Root '{title}' processed. Beginning recursive crawl...")
             # Add Root to the ancestors list
             current_ancestors = [{"id": root_id, "title": title}]
 
-            self.recursively_crawl_tree(parent_id = root_id, ancestors = current_ancestors)
+            self.recursively_crawl_tree(parent_id=root_id, ancestors=current_ancestors)
         else:
             logger.critical(f"Could not fetch root page {root_id}. Aborting crawl.")
 
@@ -105,7 +109,7 @@ class URLtoMarkdownConverter:
             None
         """
         # Prevents circular references A -> B -> A
-        parent_id = str(parent_id) # Type enforcement - For Set
+        parent_id = str(parent_id)  # Type enforcement - For Set
         if parent_id in self.visited_ids:
             return
         self.visited_ids.add(parent_id)
@@ -114,23 +118,18 @@ class URLtoMarkdownConverter:
 
         if not children:
             logger.debug(f"No children found for ID {parent_id}. Skipping.")
-        
+
         for child in children:
             # Protects against API returning None value
-            page_id = str(child.get('id') or "")
-            page_title = str(child.get('title') or "")
+            page_id = str(child.get("id") or "")
+            page_title = str(child.get("title") or "")
 
-            self.processor.process_page(
-                child_data = child, 
-                ancestors = ancestors,
-                base_url = self.base_url
-            )
+            self.processor.process_page(child_data=child, ancestors=ancestors, base_url=self.base_url)
 
             next_level_ancestors = ancestors + [{"id": page_id, "title": page_title}]
 
             time.sleep(0.2)
-            self.recursively_crawl_tree(parent_id = str(page_id), ancestors = next_level_ancestors)
-
+            self.recursively_crawl_tree(parent_id=str(page_id), ancestors=next_level_ancestors)
 
     def _fetch_immediate_children(self, parent_id: str) -> List[dict]:
         """
@@ -148,7 +147,7 @@ class URLtoMarkdownConverter:
 
         Returns:
             List[dict]: A list of raw page objects from the Confluence API (Docs: https://docs.atlassian.com/atlassian-confluence/REST/6.6.0/#content-getContentById)
-            
+
             Example Return Object:
             [
                 {
@@ -177,15 +176,15 @@ class URLtoMarkdownConverter:
             data = self._api_request(api_url, parent_id)
 
             if not data:
-                break # Break loop if request fails
-            
-            results = data.get('results', []) # Returns list[dict]
+                break  # Break loop if request fails
+
+            results = data.get("results", [])  # Returns list[dict]
 
             all_pages.extend(results)
 
             # Handles pagination
-            next_link = data.get('_links', {}).get('next')
-            
+            next_link = data.get("_links", {}).get("next")
+
             if next_link:
                 # Confluence returns a relative path like '/rest/api/content/...'
                 # Join it with the base url to get the full URL for the next loop
@@ -193,11 +192,11 @@ class URLtoMarkdownConverter:
             else:
                 # No more pages left!
                 api_url = None
-                
+
         return all_pages
 
     def _api_request(self, url: str, parent_id) -> Optional[Dict]:
-        """ 
+        """
         Executes a safe HTTP GET request with error handling.
 
         Actions:
@@ -214,10 +213,10 @@ class URLtoMarkdownConverter:
             Optional[Dict]: The parsed JSON response as a dictionary, or None if failed.
         """
         try:
-            response = self.session.get(url, params=self.params, timeout = 30) # 30 second timeout
+            response = self.session.get(url, params=self.params, timeout=30)  # 30 second timeout
             response.raise_for_status()
             return response.json()
-        
+
         except requests.exceptions.HTTPError as http_err:
             # Catches 401 (Auth), 403 (Forbidden), 404 (Not Found)
             logger.error(f"HTTP error occurred for parent id {parent_id}: {http_err}")
@@ -232,13 +231,14 @@ class URLtoMarkdownConverter:
             logger.error(f"An unexpected request error occurred for id {parent_id}: {err}")
 
         return None
-    
-    
-if __name__ == "__main__": # pragma: no cover
+
+
+if __name__ == "__main__":  # pragma: no cover
     setup_logging()
 
-    converter = URLtoMarkdownConverter(base_url = UWF_CONFLUENCE_BASE_URL, saved_data_path =  UWF_PUBLIC_KB_PROCESSED_DATE_DIR)
+    converter = URLtoMarkdownConverter(
+        base_url=UWF_CONFLUENCE_BASE_URL,
+        saved_data_path=UWF_PUBLIC_KB_PROCESSED_DATE_DIR,
+    )
 
     converter.scrape_tree(7641671)
-
-

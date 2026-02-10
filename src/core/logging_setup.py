@@ -41,6 +41,5 @@ def setup_logging(log_level=logging.INFO, log_file_path=LOG_FILE_PATH):
         # Avoid adding multiple handlers if already set up
         root_logger.addHandler(file_handler)
         root_logger.addHandler(console_handler)
-    
-    logging.info(f"Logging configuration set up successfully at log_file_path: {log_file_path}")
 
+    logging.info(f"Logging configuration set up successfully at log_file_path: {log_file_path}")

@@ -5,6 +5,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
 class FileSaver:
     """
     Persists processed data to the local file system.
@@ -12,8 +13,10 @@ class FileSaver:
     Attributes:
         processed_data_path (Path): The directory where processed data will be saved.
     """
+
     def __init__(self, processed_data_path: Union[str, Path]):
         self.processed_data_path = Path(processed_data_path)
+
     def save_markdown_file(self, content: str, output_filename: str):
         """
         Saves markdown content to a sanitized, ASCII-safe file path.
@@ -44,16 +47,20 @@ class FileSaver:
             if not output_filename:
                 logger.warning(f"Cannot save a file with no name... Check upstream functions")
                 return
-            
+
             # Prevents file names which may crash the system
-            clean_filename = re.sub(r'[^a-zA-Z0-9]', '_', output_filename.strip()) # Replace special chars with underscore + strip outer whitespace
-            clean_filename = re.sub(r'_{2,}', '_', clean_filename).strip('_') # Collapses multiple underscores into a single underscore, then strips the outer underscores.
+            clean_filename = re.sub(
+                r"[^a-zA-Z0-9]", "_", output_filename.strip()
+            )  # Replace special chars with underscore + strip outer whitespace
+            clean_filename = re.sub(r"_{2,}", "_", clean_filename).strip(
+                "_"
+            )  # Collapses multiple underscores into a single underscore, then strips the outer underscores.
             # Adds .md filename if none exists. Replaces existing file type with .md.
             output_path = (self.processed_data_path / clean_filename).with_suffix(".md")
 
             logger.info(f"Saving markdown file to: {output_path}")
 
-            with open(output_path, "w", encoding = "utf-8") as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
             logger.info(f"Markdown file saved to: {output_path}")
