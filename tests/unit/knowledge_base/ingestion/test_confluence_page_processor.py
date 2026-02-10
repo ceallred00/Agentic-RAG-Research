@@ -35,7 +35,7 @@ class TestConfluencePageProcessor:
             expected_last_updated = confluence_page.get('version', {}).get('when', "")
 
             expected_parent = ancestors[-1]['title'] if ancestors else "None"
-            expected_path_string = " / ".join([a['title'] for a in ancestors])            
+            expected_path_string = " / ".join([a['title'] for a in ancestors] + [expected_page_title])            
             
             expected_content = (
                 "---\n"
@@ -159,3 +159,31 @@ class TestConfluencePageProcessor:
                                                                           url = sample_url)
             
             confluence_processor.file_saver.save_markdown_file.assert_called_once_with(expected_content, expected_page_title)
+        def test_process_page_cleans_artifacts(self, confluence_processor, sample_confluence_page_json, sample_url, sample_ancestors):
+            """
+            Verifies that the processor creates a clean file even when the extractor returns dirty text.
+
+            Tests against any left over XML/HTML artifacts
+            """
+            # The extractor returns "Dirty" text
+            dirty_input = "Click here [>]]>](http://bad) for more info.]]>"
+            confluence_processor.content_extractor.extract.return_value = dirty_input
+            
+            confluence_processor.file_saver.save_markdown_file = MagicMock()
+
+            confluence_processor.process_page(
+                child_data=sample_confluence_page_json,
+                ancestors=sample_ancestors,
+                base_url=sample_url
+            )
+
+            expected_clean_text = "Click here  for more info." 
+
+            expected_content, _ = self._expected_values(
+                confluence_page=sample_confluence_page_json, 
+                ancestors=sample_ancestors,
+                cleaned_html=expected_clean_text,
+                url=sample_url
+            )
+
+            confluence_processor.file_saver.save_markdown_file.assert_called_once_with(expected_content, "Advising Syllabus")

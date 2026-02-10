@@ -69,7 +69,10 @@ class ConfluencePageProcessor:
         # Strip leftover XML/HTML artifacts (CDATA tags)
         cleaned_markdown = cleaned_markdown.replace("]]>", "")
 
-        path_string = " / ".join([a['title'] for a in ancestors])
+        # Create full breadcrumb trail including the current page
+        # Example: Grandparent / Parent / Current Page Title
+        full_path_list = [a['title'] for a in ancestors] + [page_title]
+        path_string = " / ".join(full_path_list)
 
         immediate_parent = ancestors[-1]['title'] if ancestors else "None"
 

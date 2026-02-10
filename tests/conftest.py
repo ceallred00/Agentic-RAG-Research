@@ -252,7 +252,7 @@ def sample_url():
     return "https://mock.uwf.edu"
 
 @pytest.fixture
-def sample_confluence_page_json():
+def sample_confluence_page_json(scope="function"): # Function scope allows for in-test modifications
     """Realistic single page object from Confluence API"""
     return {
             "id": "12345",
