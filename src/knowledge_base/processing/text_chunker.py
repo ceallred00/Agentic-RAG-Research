@@ -1,10 +1,11 @@
 import logging
 import hashlib
+import re
 import frontmatter
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from typing import List, Optional, Tuple, Dict
-from constants import PROCESSED_DATA_DIR, CHUNKING_SIZE, CHUNKING_OVERLAP
+from constants import PROCESSED_DATA_DIR, CHUNKING_SIZE, CHUNKING_OVERLAP, UWF_PUBLIC_KB_PROCESSED_DATE_DIR
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -12,10 +13,10 @@ logger = logging.getLogger(__name__)
 class TextChunker:
     """
     Handles splitting of text into chunks, supporting both:
-    1. Scraped Markdown (with YAML frontmatter for hierarchy/url).
+    1. Scraped Markdown (with YAML frontmatter for hierarchy/url/versioning).
     2. PDF/Raw Markdown (uses filename for source context).
     
-    This class prioritizies semantic boundaries by first splitting on Markdown headers,
+    This class prioritizes semantic boundaries by first splitting on Markdown headers,
     and then recursively splitting larger sections to fit context windows.
     
     The final chunks retain metadata about their header hierarchy and source file, injected in the content.
@@ -36,8 +37,6 @@ class TextChunker:
             ("##", "Header 2"), 
             ("###", "Header 3"),
             ("####", "Header 4"),
-            ("#####", "Header 5"),
-            ("######", "Header 6")
         ]
 
     def split_text(self, text: str, source_name: Optional[str] = None) -> List[Document]:
@@ -55,13 +54,18 @@ class TextChunker:
             source_name (Optional[str]): The name of the file. Used for metadata and content enrichment.
 
 
-        Returns a List[Documents]. Example format: 
+        Returns:
+            List[Documents]. 
+        
+        Example PDF Return Format: 
+            [Document(metadata={'Header 1': 'Intro', 'Header 2': 'History', 'Source': 'markdown_file.md', 'id': 'markdown_file_chunk_1'}, 
+                    page_content='Context: Source: markdown_file > Intro > History\n---\n## Intro  \n## History  \nMarkdown[9] is a lightweight markup language for creating formatted text using a plain-text editor. John Gruber created Markdown in 2004 as a markup language that is appealing to human readers in its source code form.[9]'),
+            Document(metadata={'Header 1': 'Intro', 'Header 2': 'Rise and divergence', 'Source': 'markdown_file.md', 'id': 'markdown_file_chunk_2'}, 
+                    page_content='Context: Source: markdown_file > Intro > Rise and divergence\n---\n## Rise and divergence  \nAs Markdown popularity grew rapidly, many Markdown implementations appeared, driven mostly by the need for  \nadditional features such as tables, footnotes, definition lists,[note 1] and Markdown inside HTML blocks.'),
+                    ...]
+        
+        Example Confluence URL Return Format:
 
-        [Document(metadata={'Header 1': 'Intro', 'Header 2': 'History', 'Source': 'markdown_file.md', 'id': 'markdown_file_chunk_1'}, 
-                  page_content='Context: Source: markdown_file > Intro > History\n---\n## Intro  \n## History  \nMarkdown[9] is a lightweight markup language for creating formatted text using a plain-text editor. John Gruber created Markdown in 2004 as a markup language that is appealing to human readers in its source code form.[9]'),
-        Document(metadata={'Header 1': 'Intro', 'Header 2': 'Rise and divergence', 'Source': 'markdown_file.md', 'id': 'markdown_file_chunk_2'}, 
-                 page_content='Context: Source: markdown_file > Intro > Rise and divergence\n---\n## Rise and divergence  \nAs Markdown popularity grew rapidly, many Markdown implementations appeared, driven mostly by the need for  \nadditional features such as tables, footnotes, definition lists,[note 1] and Markdown inside HTML blocks.'),
-                ...]
         """
 
         try:
@@ -69,17 +73,22 @@ class TextChunker:
             # Parse YAML metadata. 
             post = frontmatter.loads(text) # Plain text returns empty metadata
             clean_text = post.content
-            file_metadata = post.metadata # Dict of YAML keys (if any)
+            file_metadata = post.metadata 
 
+            # Split on headers
             header_splits = self._split_on_headers(clean_text)
-            recursive_chunks = self._split_recursive(header_splits) # Smaller context window
+            
+            # Split on chunk size (smaller context window)
+            recursive_chunks = self._split_recursive(header_splits) 
+            
+            # Metadata Injection & ID Generation
             final_chunks = self._enrich_metadata(recursive_chunks, file_metadata, source_name)
             
             logger.info(f"Successfully split text into {len(final_chunks)} chunks.")
             return final_chunks
 
         except Exception as e:
-            logger.error(f"Error during text chunking: {e}", exc_info=True) # Append full stack trace to the log message.
+            logger.error(f"Error during text chunking: {e}", exc_info=True)
             raise e
 
     def _split_on_headers(self, text: str) -> List[Document]:
@@ -98,11 +107,9 @@ class TextChunker:
         try:
             markdown_splitter = MarkdownHeaderTextSplitter(
                 headers_to_split_on=self.headers_to_split_on,
-                strip_headers = False
+                strip_headers=False # Keep headers in content so context isn't lost
             )
             return markdown_splitter.split_text(text) 
-
-        
         except Exception as e:
             logger.error(f"Failed to split markdown headers: {e}")
             # Return whole text as one document if markdown split fails.
@@ -116,9 +123,9 @@ class TextChunker:
         Returns a list of Document objects. 
         """
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size = self.chunk_size,
-            chunk_overlap = self.chunk_overlap,
-            separators = ["\n\n", "\n", " ", ""]
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            separators=["\n\n", "\n", " ", ""]
         )
 
         logger.info(f"Successfully split chunks into: {self.chunk_size} with {self.chunk_overlap} character overlap.")
@@ -127,103 +134,234 @@ class TextChunker:
         
     def _enrich_metadata(self, documents: List[Document], yaml_meta: Dict, source_name: Optional[str] = None) -> List[Document]:
         """
-        Iterates through chunks to:
-        1. Inject header hierarchy into the content (Context).
-        2. Inject source name into metadata and content.
-        3. Generates a deterministic, unique ID for each chunk.
+        Enriches document chunks with context, metadata, and unique IDs for RAG retrieval.
+        
+        This method iterates through the provided documents to:
+        1. Construct a rich 'Context' string (Source > Version > Headers) and prepend it to the content for the LLM.
+        2. Preserve the original, clean text in metadata for UI display.
+        3. Generate a pre-formatted 'breadcrumbs' string for frontend citations.
+        4. Assign a deterministic, unique ID to each chunk to prevent duplicates.
 
-        Before: 
-            Metadata: {'Header 1': 'Admissions', 'Header 2': 'GPA'}
-            Content: "The minimum requirement is 3.0"
-        
-        After:
-            Metadata: {'Header 1': 'Admissions', 'Header 2': 'GPA', 'Source': 'graduate-handbook', 'id': 'graduate_handbook_chunk_7'}
-            Content: "Context: Source: graduate-handbook > Admissions > GPA \n The minimum requirement is 3.0"
-        
+        Example 1: Confluence Page (Rich Metadata)
+        ------------------------------------------
+        Input:
+            Metadata: {'Header 1': 'Campus Resources', 'Header 2': 'Weather Emergency Information'}
+            Content:  "## Weather Emergency Information\n* WUWF-FM (88.1MHz) is the official information source for the University..."
+            YAML Meta: {'title': 'Advising Syllabus', 
+                        'parent': 'Academic Advising', 
+                        'path': 'UWF Public Knowledge Base / Academic Adivisng / Advising Syllabus', 
+                        'original_url': ''https://confluence.uwf.edu/pages/viewpage.action?pageId=42669534',
+                        'page_id': 42669534,
+                        'version': '34', 
+                        'last_updated': 'datetime.datetime(2022, 4, 12, 15, 55, 51, 613000, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=68400)))'
+                        }
+
+        Output:
+            Metadata: {
+                'Header 1': 'Campus Resources',
+                'Header 2': 'Weather Emergency Information',
+                'id': '42669534_chunk_40',
+                'source': 'Advising Syllabus',
+                'url': 'https://confluence.uwf.edu/pages/viewpage.action?pageId=42669534',
+                'parent': 'Academic Advising',
+                'breadcrumbs': 'Source: UWF Public Knowledge Base / Academic Advising / Advising Syllabus | Version: 34 | Last Updated: 2022-04-12 | Headers: Campus Resources > Weather Emergency Information'
+                'version': 34,
+                'last_updated': '2022-04-12',
+                'original_content': "## Weather Emergency Information \n",
+                'text': "Context:...\n##Weather Emergency Information \n..." (Enriched)
+            }
+            Content: 
+                "Context:
+                 Source: UWF Public Knowledge Base / Academic Advising / Advising Syllabus
+                 Version: 34
+                 Last Updated: 2022-04-12
+                 Headers: Campus Resources > Weather Emergency Information
+                 ---
+                 ## Weather Emergency Information \n..."
+
+        Example 2: Raw PDF/Text File (Inferred Metadata)
+        ------------------------------------------------
+        Input:
+            Metadata: {
+                        'Header 1': 'THE DEPARTMENT OF MATHEMATICS AND STATISTICS', 
+                        'Header 2': 'Program Overview'
+                    }
+            Content:  "## Program Overview  \nThe Master of Science in Mathematical Sciences..."
+            Source Name: "Graduate-Student-Handbook-2024-2025.md"
+
+        Output:
+            Metadata: {
+                'Header 1': 'THE DEPARTMENT OF MATHEMATICS AND STATISTICS', 
+                'Header 2': 'Program Overview', 
+                'id': 'graduate_student_handbook_2024_2025_chunk_18', 
+                'source': 'Graduate Student Handbook 2024 2025', 
+                'url': '', 
+                'parent': 'Document Library', 
+                'breadcrumbs': 'Source: Document Library / Graduate Student Handbook 2024 2025 | Headers: THE DEPARTMENT OF MATHEMATICS AND STATISTICS > Program Overview', 
+                'version': None, 
+                'last_updated': None, 
+                'text': 'Context:\n...\n---\n## Program Overview  \nThe Master of Science in Mathematical Sciences...'
+                'original_content': '## Program Overview  \nThe Master of Science in Mathematical Sciences...'
+            }
+            Content:
+                Context:
+                Source: Document Library / Graduate Student Handbook 2024 2025
+                Headers: THE DEPARTMENT OF MATHEMATICS AND STATISTICS > Program Overview
+                ---
+                ## Program Overview  
+                The Master of Science in Mathematical Sciences... 
+
         Returns:
-            List[Document]: The enriched documents with updated metadata and content.
+            List[Document]: The enriched documents ready for vector embedding.
         """
         enriched_docs = []
-
-        #TODO: Finish here
-        if yaml_meta:
-            source_title = yaml_meta.get('title', 'Unknown Title')
-            source_parent = yaml_meta.get('parent', 'Unknown Parent')
-            source_url = yaml_meta.get('url', None)
-
         
-        # Create a human-readable source name if provided.
-        readable_source = ""
-        # Create a URL for the source if provided. Used in ID generation.
-        clean_filename_for_id = ""
-        if source_name:
-            # Extract just the stem if a full filename or path is provided.
-            source_name = Path(source_name).stem
+        # Defaults
+        doc_title = "Unknown Document"
+        doc_parent = ""
+        doc_url = ""
+        doc_root_id = "" # Used for creating deterministic chunk IDs
+        doc_path_string = ""
 
-            # Readable for semantic context.
-            readable_source = source_name.replace("-", " ").replace("_", " ")
 
-            # Cleaned for ID generation.
-            clean_filename_for_id = source_name.replace(" ","_").replace("-","_").lower()
+        # Versioning defaults
+        doc_version = None
+        doc_last_updated = None
+        doc_last_updated_readable = None
+
+        # Confluence data
+        if yaml_meta:
+            doc_title = yaml_meta.get('title', doc_title)
+            doc_parent = yaml_meta.get('parent', '')
+            doc_url = yaml_meta.get('original_url', '')
+            doc_path_string = yaml_meta.get('path', '') # "UWF Public KB / Parent / Page"
+
+            # Extract versioning info
+            doc_version = yaml_meta.get('version', None)
+            doc_last_updated = yaml_meta.get('last_updated', None)
+
+            if doc_last_updated:
+                doc_last_updated_readable = str(doc_last_updated).split("T")[0].split(" ")[0] # Handles Iso format and Python datetimes
+            
+            # Use Confluence Page ID as the root for chunk IDs (Very Stable)
+            if 'page_id' in yaml_meta:
+                doc_root_id = str(yaml_meta['page_id'])
+            
+        # PDF / Raw File (Inferred Metadata)
+        if not doc_root_id and source_name:
+            # Clean filename: "Graduate-Handbook-2024.md" -> "Graduate Handbook 2024"
+            stem = Path(source_name).stem
+            doc_title = stem.replace("-", " ").replace("_", " ").title()
+            doc_parent = "Document Library" # Generic parent for files
+            
+            # Create a stable ID root from filename: "graduate_handbook_2024"
+            doc_root_id = re.sub(r'[^a-zA-Z0-9]', '_', stem).lower()
+
+        # Fallback ID
+        if not doc_root_id:
+            # Deterministic short ID
+            # Hashing entire content for guaranteed uniqueness
+            doc_root_id = "anon_" + hashlib.md5(documents[0].page_content.encode()).hexdigest()[:8]
+
         
         for i, doc in enumerate(documents):
+            # Generate ID
+            # Format: {page_id_or_filename}_chunk_{index} - 'graduate_handbook_2024_chunk_1' or '42669534_chunk_1'
+            chunk_id = f"{doc_root_id}_chunk_{i+1}"
+            
+            # Build context string (for LLM to read)
             context_parts = []
             
-            if source_name:
-                doc.metadata["source"] = readable_source
-
-                chunk_id = f"{clean_filename_for_id}_chunk_{i+1}"
-
-                context_parts.append(f"Source: {readable_source}")
-            
+            # Add source hierarchy
+            if doc_path_string:
+                context_parts.append(f"Source: {doc_path_string}") # Use full path if available
+            elif doc_parent:
+                context_parts.append(f"Source: {doc_parent} / {doc_title}")
             else:
-                unique_string = f"{doc.page_content}-{i}"
-                # Generates a 32-character string
-                content_hash = hashlib.md5(unique_string.encode("utf-8")).hexdigest()
-                # Total ID length: 37 characters
-                chunk_id = f"anon_{content_hash}"
-
-            doc.metadata["id"] = chunk_id
-
-            for header in self.headers_to_split_on:
-                header_title = header[1]
-                if header_title in doc.metadata:
-                    context_parts.append(doc.metadata[header_title])
+                context_parts.append(f"Source: {doc_title}")
             
-            if context_parts:
-                context_str = " > ".join(context_parts)
-                new_content =f"Context: {context_str}\n---\n{doc.page_content}"
+            # Add versioning (if available)
+            if doc_version:
+                context_parts.append(f"Version: {doc_version}")
+            if doc_last_updated_readable:
+                context_parts.append(f"Last Updated: {doc_last_updated_readable}")
 
-                doc.page_content = new_content
-
-            # Add doc to the list regardless if markdown headers existed.
+            # Add header context (Extracted by MarkdownHeaderTextSplitter)
+            header_context = []
+            for _, header_name in self.headers_to_split_on:
+                if header_name in doc.metadata:
+                    header_context.append(doc.metadata[header_name])
+            
+            if header_context:
+                context_parts.append(f"Headers: {' > '.join(header_context)}")
+            
+            context_str = "\n".join(context_parts)
+            
+            new_content = f"Context:\n{context_str}\n---\n{doc.page_content}"
+            
+            # Update metadata (For database filtering)
+            doc.metadata.update({
+                "id": chunk_id,
+                "source": doc_title,
+                "url": doc_url,
+                "parent": doc_parent,
+                "breadcrumbs": context_str.replace("\n", " | "), # Easily returns source information to frontend (more customizable than raw enriched content)
+                "version": doc_version,
+                "last_updated": doc_last_updated_readable,
+                "text": new_content, # Gives RAG LLM access to source path, header hierarchy, versioning info, date of last update, in addition to raw context.
+                "original_content": doc.page_content # Keep pure content for LLM to return to the user (doesn't require second DB lookup for content)
+            })
+            
+            doc.page_content = new_content
             enriched_docs.append(doc)
     
         return enriched_docs
-                
 
-# --- Example Usage ---
 if __name__=="__main__": # pragma: no cover
-    file_name = "Graduate-Student-Handbook-2024-2025.md"
-    file_path = Path(PROCESSED_DATA_DIR) / file_name
-
-    if file_path.exists():
-        with open(file_path, "r", encoding = "utf-8") as f:
-            markdown_content = f.read()
-        
-        chunker = TextChunker()
-        # Returns List[Document]
-        chunks = chunker.split_text(markdown_content)
-        print(type(chunks))
-        print(type(chunks[0]))
-
-        for i, chunk in enumerate(chunks[:100]):
-            print(f"\n--- Chunk {i+1} ---")
-            print(f"Metadata: {chunk.metadata}")
-            print(f"Content Preview: {chunk.page_content}")
-    else:
-        print(f"File not found: {file_path}")
-
-
-
+    chunker = TextChunker()
     
+    # Define files to test
+    files_to_process = [
+        # PDF / Raw Markdown File
+        # {
+        #     "name": "Graduate-Student-Handbook-2024-2025.md",
+        #     "path": Path(PROCESSED_DATA_DIR) / "Graduate-Student-Handbook-2024-2025.md"
+        # },
+        # Confluence Scraped File (YAML)
+        {
+            "name": "Advising Syllabus",
+            "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Advising_Syllabus.md"
+        }
+    ]
+
+    print("\n=== STARTING CHUNKER TEST ===\n")
+
+    for file_info in files_to_process:
+        f_path = file_info["path"]
+        f_name = file_info["name"]
+
+        print(f"\n---> Processing: {f_name}")
+        
+        if f_path.exists():
+            with open(f_path, "r", encoding="utf-8") as f:
+                markdown_content = f.read()
+            
+            # Run the chunker
+            chunks = chunker.split_text(markdown_content, source_name=f_name)
+            
+            print(f"    Generated {len(chunks)} chunks.")
+            
+            # Print preview of the first chunk to verify metadata injection
+            if chunks:
+                new_chunks = chunks[15:20]
+                # # print(new_chunks)
+                # new_chunk = chunks[39:40]
+                for chunk in new_chunks:
+                    print(f"\n\nChunk ID: {chunk.metadata.get('id')}")
+                    print(f"Chunk Metadata: {chunk.metadata}")
+                    print(f"\n{chunk.page_content}")
+
+        else:
+            print(f"    [ERROR] File not found at: {f_path}")
+
+    print("\n=== TEST COMPLETE ===")

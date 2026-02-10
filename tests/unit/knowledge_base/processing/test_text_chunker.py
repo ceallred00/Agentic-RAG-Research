@@ -1,4 +1,5 @@
 import pytest
+import copy
 from langchain_core.documents import Document
 from unittest.mock import patch
 from pathlib import Path
@@ -87,131 +88,154 @@ class TestTextChunker:
             assert len(docs) == 1
             assert docs[0].page_content == short_text_chunk[0].page_content         
 
-    class TestEnrichMetadata:
-        """Test the _enrich_metadata method."""
+class TestEnrichMetadata:
+    """Test the _enrich_metadata method."""
+    SCENARIOS = [
+        {
+            "id": "File_Happy_Path",
+            "inputs": {
+                "source": "Graduate-Handbook.pdf",
+                "yaml": {}
+            },
+            "expectations": {
+                "id_prefix": "graduate_handbook",               # Cleaned filename
+                "meta_source": "Graduate Handbook",             # Cleaned title in metadata
+                "content_breadcrumb": "Document Library / Graduate Handbook", 
+                "last_updated": None,                           # PDF files not expected to have update date
+                "version": None,
+                "is_anonymous": False
+            }
+        },
+        {
+            "id": "File_Anonymous",
+            "inputs": {
+                "source": None,                                 # Missing Source
+                "yaml": {}
+            },
+            "expectations": {
+                "id_prefix": "anon_",                           # Hash fallback
+                "meta_source": "Unknown Document",              # Cleaned title in metadata - Uses default
+                "content_breadcrumb": "Unknown Document",       # No parent for file
+                "last_updated": None,                           # PDF files not expected to have update date
+                "version": None,
+                "is_anonymous": True
+            }
+        },
+        {
+            "id": "Confluence_Mode",
+            "inputs": {
+                "source": None,
+                "yaml": {
+                    'title': 'Advising Syllabus', 
+                        'parent': 'Academic Advising', 
+                        'path': 'UWF Public Knowledge Base / Academic Advising / Advising Syllabus', # Full path provided by Confluence
+                        'original_url': 'https://confluence.uwf.edu/pages/viewpage.action?pageId=42669534',
+                        'page_id': 42669534,
+                        'version': '34', 
+                        'last_updated': '2022-04-12T15:55:51.613Z'
+                }
+            },
+            "expectations": {
+                "id_prefix": "42669534",                        # Page ID becomes root
+                "meta_source": "Advising Syllabus",
+                "content_breadcrumb": "UWF Public Knowledge Base / Academic Advising / Advising Syllabus",
+                "last_updated": "2022-04-12",                   # Expecting clean YYYY-MM-DD
+                "version": '34',
+                "is_anonymous": False
+            }
+        }
+    ]
+
+    @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda x: x["id"])
+    def test_enrichment_logic_master(self, text_chunker, short_text_chunk, scenario):
+        """
+        Validates ID generation, source injection, and header preservation across all modes.
         
-        # Internal fixtures used by this class only.
-        @pytest.fixture
-        def doc_1(self):
-            return Document(page_content = "Duplicate text", metadata={})
-        @pytest.fixture
-        def doc_2(self):
-            return Document(page_content = "Duplicate text", metadata={})
-
-        def _assert_id_behavior(self, docs: List[Document]):
-            id_1 = docs[0].metadata['id']
-            id_2 = docs[1].metadata['id']
-
-            assert id_1 != id_2
-
-            return (id_1, id_2)
-
-        def test_injects_header_hierarchy_into_content(self, text_chunker, valid_pdf_filepath, short_text_chunk):
-            """
-            Verify that header metadata is correctly formatted and prepended to the text content.
-            """
-            original_text = short_text_chunk[0].page_content
-
-            docs = text_chunker._enrich_metadata(documents = short_text_chunk, source_name = valid_pdf_filepath)
-
-            # Check that the headers have been inserted
-            assert "First Header > Second Header" in docs[0].page_content
-            # Check that the original content is still there
-            assert original_text in docs[0].page_content
-            # Check that "Context: is added at the beginning"
-            assert docs[0].page_content.startswith("Context:")
-
-        def test_adds_source_metadata_and_content(self, text_chunker, valid_pdf_filepath, short_text_chunk):
-            """
-            Verify that source filenames are cleaned, added to metadata, and injected into content text.
-            """
-            docs = text_chunker._enrich_metadata(
-                documents = short_text_chunk, 
-                source_name = valid_pdf_filepath)
-
-            # Replicate function cleaning logic
-            file_name = Path(valid_pdf_filepath).stem
-            expected_source_name = file_name.replace("-", " ").replace("_", " ")
-            expected_id_prefix = file_name.replace(" ","_").replace("-","_").lower()
-
-            # Verify metadata
-            assert 'id' in docs[0].metadata
-            assert expected_id_prefix in docs[0].metadata['id']
-            assert "chunk" in docs[0].metadata['id']
-
-            assert 'source' in docs[0].metadata
-            assert expected_source_name == docs[0].metadata['source']
-
-            # Verify content injection
-            doc_content = docs[0].page_content
-            assert f"Source: {expected_source_name}" in doc_content
-
-        def test_assigns_unique_ids_with_source(self, text_chunker, valid_pdf_filepath, doc_1, doc_2):
-            """
-            Verify IDs use the filename and an incrementing counter when source is provided.
-            """
-            docs = text_chunker._enrich_metadata([doc_1, doc_2], source_name = valid_pdf_filepath)
-
-            id_1, id_2 = self._assert_id_behavior(docs)
-
-            assert "chunk_1" in id_1
-            assert "chunk_2" in id_2
+        Duplicate content is passed to ensure the ID counter works even when content hashes collide.
+        """
+        inputs = scenario["inputs"]
+        expects = scenario["expectations"]
         
-        def test_assigns_unique_ids_without_source(self, text_chunker, doc_1, doc_2):
-            """
-            Verify IDs are unique even when source is missing and content is identical.
-            This ensures the hashing logic includes the chunk index to prevent collisions.
-            """
+        # Creates deep copy of first document
+        # This guarantees that docs[0] and docs[1] have identical content and metadata but that they are not tied to same object.
+        # If the ID logic is broken, these will generate the same ID.
+        docs = [copy.deepcopy(short_text_chunk[0]) for _ in range(2)]
 
-            docs = text_chunker._enrich_metadata([doc_1, doc_2])
+        enriched = text_chunker._enrich_metadata(
+            docs, 
+            yaml_meta=inputs["yaml"], 
+            source_name=inputs["source"]
+        )
 
-            id_1, id_2 = self._assert_id_behavior(docs)
+        first_doc = enriched[0]
+        second_doc = enriched[1]
 
-            assert id_1.startswith("anon_")
-            assert id_2.startswith("anon_")
 
-            # Length should be 37 characters (32 char hash + 5 char prefix)
-            assert len(id_1) == 37
-            assert len(id_2) == 37
+        # All scenarios should inject headers if they exist in the input doc
+        assert "First Header > Second Header" in first_doc.page_content
+        assert "First Header > Second Header" in second_doc.page_content
 
+        assert "Context:" in first_doc.page_content
+        assert "Context:" in second_doc.page_content
         
-        def test_handles_missing_metadata_and_source(self, text_chunker):
-            """
-            Test case for missing both header metadata and source information.
-            """
-            plain_text = "Plain text."
-            plain_document = Document(
-                page_content = plain_text,
-                metadata = {}
-            )
+        # Verify the ID matches the expected prefix strategy
+        assert first_doc.metadata['id'].startswith(expects["id_prefix"])
+        
+        # Even though content is identical, IDs must be unique due to chunk index
+        assert "chunk_1" in first_doc.metadata['id']
+        assert "chunk_2" in second_doc.metadata['id']
+        assert first_doc.metadata['id'] != second_doc.metadata['id']
 
-            docs = text_chunker._enrich_metadata(documents=[plain_document])
+        assert first_doc.metadata.get('source') == expects["meta_source"]
+        assert first_doc.metadata.get('version') == expects["version"]
+        assert first_doc.metadata.get('last_updated') == expects["last_updated"]
 
-            assert len(docs) == 1
+        if expects["is_anonymous"]:
+            # Verify we are using the hash logic (13+ chars)
+            assert len(first_doc.metadata['id']) > 13 
 
-            doc_content = docs[0].page_content
-            # Check that the original content was kept.
-            assert plain_text in doc_content
-            # Check that the function didn't unnecessarily add any characters related to the metadata.
-            assert ">" not in docs[0].page_content
-            assert "Context:" not in doc_content
+        # Verify the source is cleaned and injected correctly
+        expected_line = f"Source: {expects['content_breadcrumb']}"
+        assert expected_line in first_doc.page_content
+        assert expected_line in second_doc.page_content
 
-            # Check that 'source' was not added into the metadata.
-            assert 'source' not in docs[0].metadata
+        assert expected_line in first_doc.metadata['breadcrumbs']
+        assert expected_line in second_doc.metadata['breadcrumbs']
 
-            # Check that 'id' was generated correctly:
-            assert 'id' in docs[0].metadata
-            assert 'anon_' in docs[0].metadata['id']
-        def test_handles_missing_source_name_gracefully(self, text_chunker, short_text_chunk):
-            """
-            Verify that headers are still injected even if source_name is missing.
-            """
-            docs = text_chunker._enrich_metadata(documents = short_text_chunk)
+        if expects["last_updated"]:
+            assert f"Last Updated: {expects['last_updated']}" in first_doc.page_content
+            assert f"Last Updated: {expects['last_updated']}" in second_doc.page_content
+            assert f"Version: {expects['version']}" in first_doc.page_content
+            assert f"Version: {expects['version']}" in second_doc.page_content
 
-            doc_content = docs[0].page_content
+        else:
+            # Verify we didn't inject "None" or empty strings into the text
+            assert "Last Updated: None" not in first_doc.page_content
+            assert "Last Updated: None" not in second_doc.page_content
+            assert "Version:" not in first_doc.page_content
+            assert "Version:" not in second_doc.page_content
 
-            assert 'Source' not in doc_content
-            assert doc_content.startswith("Context:")
-            assert '>' in doc_content
-            assert 'id' in docs[0].metadata
-            assert 'anon_' in docs[0].metadata['id']
+    def test_handles_empty_metadata_source(self, text_chunker):
+        """
+        Verifies that 'Headers:' and breadcrumbs are omitted when input metadata is empty.
+        
+        (The Master test cannot check this because it assumes input headers exist).
+        """
+        plain_document = Document(page_content="Plain text.", metadata={})
+
+        docs = text_chunker._enrich_metadata(
+            documents=[plain_document], 
+            yaml_meta={}, 
+            source_name=None
+        )
+
+        # Since metadata={} was empty, the code should not have added the "Headers:" line
+        assert "Headers" not in docs[0].page_content
+        assert "Headers" not in docs[0].metadata.get("breadcrumbs", "")
+        
+        # Check fallbacks
+        assert docs[0].metadata['source'] == "Unknown Document"
+        assert docs[0].metadata['id'].startswith("anon_")
+        assert "Context:" in docs[0].page_content
+        assert "Unknown Document" in docs[0].page_content
+        assert "Headers" not in docs[0].page_content
