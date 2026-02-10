@@ -141,7 +141,8 @@ def base_agent(state: AgentState) -> AgentState:  # type: ignore
     """
     Main decision-making node.
     """
-    system_prompt = SystemMessage(content=f"""
+    system_prompt = SystemMessage(
+        content=f"""
         You are the UWF Student Assistant, a helpful AI dedicated to University of West Florida students.
 
         CORE WORKFLOW:
@@ -169,7 +170,8 @@ def base_agent(state: AgentState) -> AgentState:  # type: ignore
         - If you lack required tool arguments (like a department name), stop and ask the user for that specific information.
         - Be professional, empathetic, and concise.
 
-        """)
+        """
+    )
 
     # Rules first + conversation history + most recent user message
     messages = [system_prompt] + list(state["messages"])
