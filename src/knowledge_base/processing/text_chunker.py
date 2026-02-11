@@ -350,7 +350,7 @@ if __name__ == "__main__":  # pragma: no cover
         # Confluence Scraped File (YAML)
         {
             "name": "Advising Syllabus",
-            "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Advising_Syllabus.md",
+            "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Viewing_a_Degree_Audit.md",
         }
     ]
 
@@ -373,12 +373,9 @@ if __name__ == "__main__":  # pragma: no cover
 
             # Print preview of the first chunk to verify metadata injection
             if chunks:
-                new_chunks = chunks[15:20]
-                # # print(new_chunks)
-                # new_chunk = chunks[39:40]
-                for chunk in new_chunks:
+                for chunk in chunks:
                     print(f"\n\nChunk ID: {chunk.metadata.get('id')}")
-                    print(f"Chunk Metadata: {chunk.metadata}")
+                    #print(f"Chunk Metadata: {chunk.metadata}")
                     print(f"\n{chunk.page_content}")
 
         else:

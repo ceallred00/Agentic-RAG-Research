@@ -17,6 +17,7 @@ from knowledge_base.ingestion.confluence_content_extractor import (
 from knowledge_base.ingestion.confluence_page_processor import ConfluencePageProcessor
 from knowledge_base.ingestion.url_to_md_converter import URLtoMarkdownConverter
 from knowledge_base.processing.text_chunker import TextChunker
+from knowledge_base.pipeline.knowledge_base_pipeline import KnowledgeBasePipeline
 
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
@@ -420,6 +421,33 @@ def mock_vector_normalizer():
         mock.normalize.side_effect = lambda vectors, vector_type: "DENSE"
         yield mock
 
+@pytest.fixture
+def mock_full_KB_pipeline(valid_raw_data_dir, valid_processed_data_dir):
+    """
+    Creates a KnowledgeBasePipeline instance where __init__ runs normally,
+    but all external dependencies (Converter, Embedders, Chunker) are mocked.
+    """
+    # We patch the classes inside the pipeline module so __init__ uses our Mocks
+    with patch('src.knowledge_base.pipeline.knowledge_base_pipeline.ExecutionService') as MockExec, \
+         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.PDFToMarkdownConverter') as MockConverter, \
+         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.TextChunker') as MockChunker, \
+         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.GeminiEmbedder') as MockGemini, \
+         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.PineconeSparseEmbedder') as MockPinecone:
+        
+        pipeline = KnowledgeBasePipeline(
+            kb_name="test_kb",
+            raw_data_path=valid_raw_data_dir,
+            processed_data_path=valid_processed_data_dir
+        )
+
+        pipeline.execution_service = MagicMock()
+        pipeline.converter = MagicMock()
+        pipeline.chunker = MagicMock()
+        pipeline.gemini_embedder = MagicMock()
+        pipeline.pinecone_embedder = MagicMock()
+        pipeline.pc = MagicMock()
+
+        yield pipeline
 
 # ==============================================================================
 # 4. SERVICE INSTANCES

@@ -84,10 +84,11 @@ class PDFToMarkdownConverter:
 
 # --- Example Usage ---
 if __name__ == "__main__":  # pragma: no cover
-    file_name = "AFH1.pdf"
+    file_name = "Graduate-Student-Handbook-2024-2025.pdf"
 
     processor = PDFToMarkdownConverter()
 
     handbook = processor.load_pdf_as_markdown(file_name)
-    if handbook:
-        processor.save_markdown_file(handbook[0].page_content, file_name)
+    print(len(handbook))
+    #if handbook:
+        #processor.save_markdown_file(handbook[0].page_content, file_name)

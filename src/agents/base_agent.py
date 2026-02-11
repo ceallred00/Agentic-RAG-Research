@@ -11,8 +11,6 @@ Future iterations will include:
 """
 
 import logging
-import os
-from typing import List
 from dotenv import load_dotenv
 from langchain_core.messages import ToolMessage, SystemMessage, AIMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -23,7 +21,6 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from google.genai.errors import ServerError
-from pydantic import SecretStr
 from core.agent_state import AgentState
 from core.execution_service import ExecutionService
 from utils.application_streamer import application_streamer
