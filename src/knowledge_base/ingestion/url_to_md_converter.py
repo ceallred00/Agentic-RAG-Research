@@ -65,6 +65,7 @@ class URLtoMarkdownConverter:
         """
         root_id = str(root_id)
         url = f"{self.base_url}/rest/api/content/{root_id}"
+        logger.info(f"Beginning to scrape: {url}")
 
         root_data = self._api_request(url, root_id)
 
@@ -114,6 +115,7 @@ class URLtoMarkdownConverter:
             return
         self.visited_ids.add(parent_id)
 
+        logger.info(f"Fetching children for {parent_id}")
         children = self._fetch_immediate_children(parent_id)
 
         if not children:
@@ -234,7 +236,7 @@ class URLtoMarkdownConverter:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    setup_logging()
+    # setup_logging()
 
     converter = URLtoMarkdownConverter(
         base_url=UWF_CONFLUENCE_BASE_URL,

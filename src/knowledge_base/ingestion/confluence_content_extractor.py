@@ -36,7 +36,6 @@ class ConfluenceContentExtractor:
 
         # Use 'lxml' for speed and better handling of XML tags like <ac:link>
         soup = BeautifulSoup(raw_html, "lxml")
-        print(soup)
 
         # Remove Confluence macro noise
         # Remove all <ac:parameter> tags
@@ -98,7 +97,6 @@ class ConfluenceContentExtractor:
         # We process just the body content to avoid extra noise.
         body_content = soup.body if soup.body else soup
         clean_html = str(body_content)
-        print(clean_html)
 
         # Markdownify strips tags but keeps text
         # ATX ensures headers use the (#) format

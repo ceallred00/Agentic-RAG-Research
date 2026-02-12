@@ -1,5 +1,6 @@
 import logging
 import regex as re
+import yaml
 from knowledge_base.ingestion.confluence_content_extractor import (
     ConfluenceContentExtractor,
 )
@@ -54,6 +55,7 @@ class ConfluencePageProcessor:
         """
         page_id = str(child_data.get("id") or "")
         page_title = str(child_data.get("title") or "")
+        logger.info(f"Processing {page_title}")
 
         # Defaults
         version_num = 1
@@ -91,18 +93,26 @@ class ConfluencePageProcessor:
 
         full_url = f"{base_url}/pages/viewpage.action?pageId={page_id}"
 
-        # Metadata added as YAML Frontmatter
-        final_content = (
-            f"---\n"
-            f"title: {page_title}\n"
-            f"parent: {immediate_parent}\n"
-            f"path: {path_string}\n"
-            f"original_url: {full_url}\n"
-            f"page_id: {page_id}\n"
-            f"version: {version_num}\n"
-            f"last_updated: {last_updated}\n"
-            f"---\n\n"
-            f"{cleaned_markdown}"
+        metadata = {
+            "title": page_title,
+            "parent": immediate_parent,
+            "path": path_string,
+            "original_url": full_url,
+            "page_id": page_id,
+            "version": version_num,
+            "last_updated": last_updated
+        }
+
+        # Removes : and other special characters which will cause errors when the text is chunked.
+        yaml_frontmatter = yaml.safe_dump(
+            metadata, 
+            sort_keys=False,     # Preserves insertion order
+            allow_unicode=True,  # Protects em-dashes and accents
+            width=float("inf")   # Prevents long URLs from wrapping onto new lines
         )
+
+        # Metadata added as YAML Frontmatter
+        # yaml_frontmatter ends with a newline
+        final_content = f"---\n{yaml_frontmatter}---\n\n{cleaned_markdown}"
 
         self.file_saver.save_markdown_file(final_content, page_title)

@@ -301,11 +301,11 @@ if __name__ == "__main__": # pragma: no cover
     #         print(f"Chunk Metadata: {chunk.metadata}")
     #         print(f"\n{chunk.page_content}")
 
-    files = ['Phishing_Defense_Test_Simulation.md', 'Eduroam_Setup_Instructions_Chromebook.md', 'Eduroam_Setup_Instructions_Windows_11.md', 'How_to_Create_a_Profile_on_the_RecWell_Fusion_Portal_and_Sign_the_Release_of_Liability_Form_Community_Members.md', 'Eduroam_Setup_Instructions_macOS.md']
+    #files = ['Phishing_Defense_Test_Simulation.md', 'Eduroam_Setup_Instructions_Chromebook.md', 'Eduroam_Setup_Instructions_Windows_11.md', 'How_to_Create_a_Profile_on_the_RecWell_Fusion_Portal_and_Sign_the_Release_of_Liability_Form_Community_Members.md', 'Eduroam_Setup_Instructions_macOS.md']
     
     chunks = pipeline.run(
         source_type = SourceType.MARKDOWN,
-        specific_files = files
+        specific_files = None
     )
 
     print(len(chunks))
