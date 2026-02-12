@@ -26,12 +26,17 @@ def upsert_to_vector_db(
 
     Pinecone Hybrid Index Documentation: https://docs.pinecone.io/guides/search/hybrid-search#use-a-single-hybrid-index
     """
-
+    if len(text_chunks) != len(dense_embeddings) or len(text_chunks) != len(sparse_embeddings):
+        error_msg = (
+            f"""Dimension mismatch between text chunks and embedding vectors.\n Text Chunk Length: {len(text_chunks)}, Dense Embedding Length: {len(dense_embeddings)}, Sparse Embedding Length: {len(sparse_embeddings)}"""
+        )
+        logger.critical(error_msg)
+        raise ValueError("Dimension mismatch between text chunks and embeddings.")
     try:
         index = pinecone_client.Index(index_name)
     except Exception as e:
         logger.error(f"Failed to connect to index '{index_name}': {e}")
-        raise e
+        raise
 
     records = []
     # Zip together the chunks and their corresponding embeddings
@@ -74,6 +79,6 @@ def upsert_to_vector_db(
             logger.info(f"Upserted batch {batch_num} ({len(batch)} vectors).")
         except Exception as e:
             logger.error(f"Failed to upsert batch starting at index {i}: {e}")
-            raise e
+            raise
 
     logger.info(f"Successfully finished upserting {total_vectors} vectors.")

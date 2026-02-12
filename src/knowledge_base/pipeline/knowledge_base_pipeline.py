@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from pathlib import Path
 from enum import Enum
 from typing import List, Optional, Union
@@ -11,6 +12,7 @@ from knowledge_base.processing.pinecone_sparse_embedder import PineconeSparseEmb
 from knowledge_base.processing.gemini_embedder import GeminiEmbedder
 from knowledge_base.vector_db.create_vector_db_index import create_vector_db_index
 from knowledge_base.vector_db.upsert_to_vector_db import upsert_to_vector_db
+from langchain_core.documents import Document
 
 from constants import PROCESSED_DATA_DIR, UWF_PUBLIC_KB_PROCESSED_DATE_DIR, RAW_DATA_DIR
 
@@ -76,7 +78,8 @@ class KnowledgeBasePipeline:
             source_type: Enum (SourceType.PDF or SourceType.MARKDOWN).
             specific_files: Optional list of filenames. If None, scans entire dir.
         """
-
+        logger.info(f"Starting Pipeline for KB: {self.kb_name}")
+        
         if source_type == SourceType.PDF:
             search_dir = self.raw_data_path
             logger.info(f"Source Type is PDF. Scanning RAW directory: {search_dir}")
@@ -87,8 +90,6 @@ class KnowledgeBasePipeline:
         
         else:
             raise ValueError(f"Unsupported SourceType: {source_type}")
-
-        logger.info(f"Starting Pipeline for KB: {self.kb_name}")
 
         try:
             files = self._discover_files(source_dir=search_dir, source_type = source_type, specific_files= specific_files)
@@ -137,21 +138,23 @@ class KnowledgeBasePipeline:
                 # Continue to iterate through list
                 logger.error(f"Failed to process file {file_path.name}: {e}", exc_info = True)
         
-        if not all_chunks:
-            logger.error("Pipeline finished with no chunks generated. Exiting")
-            return
+        if all_chunks:
+            self._export_chunks(all_chunks)
+        else:
+            error_msg = "Pipeline finished with no chunks generated. Exiting"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         if skipped_md_files:
             logger.warning(f"{len(skipped_md_files)} files were skipped. File names: {skipped_md_files}")
         if error_files:
             logger.warning(f"Errors processing {len(error_files)} files. File names: {error_files}")
         
-        logger.info(f"Files Discovered: {len(files)}")
-        logger.info(f"Successfully chunked {len(files)-len(skipped_md_files)-len(error_files)} files.")
+        logger.info(f"Successfully chunked {len(files)-len(skipped_md_files)-len(error_files)} files out of {len(files)} total files.")
         logger.info(f"Total chunks: {len(all_chunks)}")
 
-        # Embed and Upsert Files Here
-    
+        self._embed_and_upsert(all_chunks)
+
         logger.info("Pipeline completed successfully.")
         return all_chunks
 
@@ -160,8 +163,8 @@ class KnowledgeBasePipeline:
         Locates and validates input files for the ingestion pipeline.
 
         This method acts as the gatekeeper for the pipeline. It can operate in two modes:
-        1. **Specific Mode**: Validates a provided list of filenames within the source directory.
-        2. **Discovery Mode**: Scans the source directory for all files matching the 
+        1. Specific Mode: Validates a provided list of filenames within the source directory.
+        2. Discovery Mode: Scans the source directory for all files matching the 
            provided `SourceType` extension.
 
         Args:
@@ -234,11 +237,11 @@ class KnowledgeBasePipeline:
 
         This method coordinates the transformation of raw input into the required Markdown 
         format. It implements a 'lazy conversion' strategy to optimize performance:
-        1. **Markdown Passthrough**: If the source is already Markdown, it returns the 
+        1. Markdown Passthrough: If the source is already Markdown, it returns the 
            original path.
-        2. **Cache Check**: If the source is a PDF, it checks `processed_data_path` for 
+        2. Cache Check: If the source is a PDF, it checks `processed_data_path` for 
            an existing `.md` file to avoid redundant conversion.
-        3. **PDF Conversion**: If no cached version exists, it invokes the `PDFToMarkdownConverter` 
+        3. PDF Conversion: If no cached version exists, it invokes the `PDFToMarkdownConverter` 
            to generate, save, and return the path to a new Markdown file.
 
         Args:
@@ -286,6 +289,92 @@ class KnowledgeBasePipeline:
             except Exception as e:
                 logger.error(f"Conversion failed: {e}", exc_info = True)
                 return None
+    def _embed_and_upsert(self, chunks: List[Document]) -> None:
+        """
+        Generates hybrid embeddings and upserts vectors into the Pinecone index.
+
+        This is a critical-path operation that orchestrates the final stage of the pipeline:
+        1. Index Check: Verifies the target Pinecone index exists; creates it if absent.
+           This runs first to fail fast before incurring embedding API costs.
+        2. Dense Embedding: Generates dense vectors via Gemini (batched internally).
+        3. Sparse Embedding: Generates sparse vectors via Pinecone inference (batched internally).
+        4. Upsert: Writes the hybrid vectors and metadata to the Pinecone index.
+
+        Args:
+            chunks (List[Document]): Document chunks with enriched content and metadata,
+                as produced by the chunking stage.
+
+        Raises:
+            RuntimeError: If dense or sparse embedding generation fails.
+            Exception: If index creation or the upsert operation fails.
+
+        """
+        # Ensure Pinecone index exists before spending time/cost on embeddings
+        try:
+            if not self.pc.has_index(self.kb_name):
+                logger.info(f"Pinecone index '{self.kb_name}' not found. Creating...")
+                create_vector_db_index(pinecone_client=self.pc, index_name=self.kb_name)
+            else:
+                logger.info(f"Pinecone index '{self.kb_name}' already exists.")
+        except Exception as e:
+            logger.error(f"Failed to verify/create Pinecone index '{self.kb_name}': {e}")
+            raise 
+
+        # Generate dense embeddings (Gemini)
+        try:
+            logger.info(f"Generating dense embeddings for {len(chunks)} chunks...")
+            dense_embeddings = self.gemini_embedder.embed_KB_document_dense(document=chunks)
+            logger.info(f"Generated {len(dense_embeddings)} dense embeddings.")
+        except RuntimeError as e:
+            logger.error(f"Dense embedding failed for KB '{self.kb_name}'. Aborting pipeline.")
+            raise 
+
+        # Generate sparse embeddings (Pinecone)
+        try:
+            logger.info(f"Generating sparse embeddings for {len(chunks)} chunks...")
+            sparse_embeddings = self.pinecone_embedder.embed_KB_document_sparse(inputs=chunks)
+            logger.info(f"Generated {len(sparse_embeddings)} sparse embeddings.")
+        except RuntimeError as e:
+            logger.error(f"Sparse embedding failed for KB '{self.kb_name}'. Aborting pipeline.")
+            raise 
+        try:
+            upsert_to_vector_db(
+                pinecone_client=self.pc,
+                index_name=self.kb_name,
+                text_chunks=chunks,
+                dense_embeddings=dense_embeddings,
+                sparse_embeddings=sparse_embeddings,
+            )
+
+            logger.info(f"Embed and upsert complete for KB: {self.kb_name}")
+        except Exception as e:
+            logger.error(f"Upsertion failed for KB '{self.kb_name}'. Aborting pipeline.")
+            raise
+
+    def _export_chunks(self, chunks: List[Document], filename: str = "all_chunks.json"):
+            """
+            Exports the generated chunks to a JSON file for inspection/backup.
+            """
+            # self.processed_data_path is a Path object (sanitized upon class initialization)
+            output_path = self.processed_data_path / filename
+            logger.info(f"Exporting {len(chunks)} chunks to {output_path}...")
+            
+            try:
+                # Convert Document objects to dicts
+                data_to_save = [
+                    {
+                        "content": chunk.page_content,
+                        "metadata": chunk.metadata
+                    }
+                    for chunk in chunks
+                ]
+
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(data_to_save, f, indent=2, ensure_ascii=False)
+                    
+                logger.info("Export complete.")
+            except Exception as e:
+                logger.error(f"Failed to export chunks: {e}")
 
 if __name__ == "__main__": # pragma: no cover
     pipeline = KnowledgeBasePipeline(kb_name = "test",
@@ -308,4 +397,4 @@ if __name__ == "__main__": # pragma: no cover
         specific_files = None
     )
 
-    print(len(chunks))
+    

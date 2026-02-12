@@ -1,6 +1,7 @@
 import logging
 import hashlib
 import re
+import json
 import frontmatter
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
@@ -344,15 +345,15 @@ if __name__ == "__main__":  # pragma: no cover
     # Define files to test
     files_to_process = [
         # PDF / Raw Markdown File
-        {
-            "name": "Graduate-Student-Handbook-2024-2025.md",
-            "path": Path(PROCESSED_DATA_DIR) / "Graduate-Student-Handbook-2024-2025.md"
-        },
-        # Confluence Scraped File (YAML)
         # {
-        #     "name": "Advising Syllabus",
-        #     "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Advising_Syllabus.md",
-        # }
+        #     "name": "Graduate-Student-Handbook-2024-2025.md",
+        #     "path": Path(PROCESSED_DATA_DIR) / "Graduate-Student-Handbook-2024-2025.md"
+        # },
+        # Confluence Scraped File (YAML)
+        {
+            "name": "Advising Syllabus",
+            "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Viewing_a_Degree_Audit.md",
+        }
     ]
 
     print("\n=== STARTING CHUNKER TEST ===\n")
@@ -372,8 +373,14 @@ if __name__ == "__main__":  # pragma: no cover
 
             print(f"    Generated {len(chunks)} chunks.")
 
-            truncated_chunks = chunks[20:25]
-            print(truncated_chunks)
+            truncated_chunks = chunks[0:10]
+            for chunk in chunks:
+                json_str = json.dumps(chunk.metadata).encode('utf-8')
+                print(chunk.metadata['id'])
+                print(f"Size: {len(json_str)} bytes")
+                
+
+            # print(truncated_chunks)
 
             # Print preview of the first chunk to verify metadata injection
             # if truncated_chunks:
@@ -381,6 +388,7 @@ if __name__ == "__main__":  # pragma: no cover
             #         print(f"\n\nChunk ID: {chunk.metadata.get('id')}")
             #         print(f"Chunk Metadata: {chunk.metadata}")
             #         print(f"\n{chunk.page_content}")
+
         else:
             print(f"    [ERROR] File not found at: {f_path}")
 

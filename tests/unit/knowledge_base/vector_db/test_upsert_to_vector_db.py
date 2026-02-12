@@ -116,3 +116,30 @@ class TestUpsertToVectorDb:
         # Batch size is 2. Total items is 3.
         # Expect 2 calls (Batch A=[1,2], Batch B=[3])
         assert mock_index_object.upsert.call_count == 2
+    def test_list_dimension_mismatch(self, mock_pinecone_client, caplog):
+        size = 3
+        chunks = [Document(page_content=f"{i}", metadata={"id": f"{i}"}) for i in range(size)]
+        dense = [[0.1]*768]*size
+        sparse_mock = MagicMock()
+        sparse_mock.sparse_indices = [1]
+        sparse_mock.sparse_values = [0.5]
+        sparse = [sparse_mock]
+
+        mock_pinecone_client.Index = MagicMock()
+
+        with pytest.raises(ValueError) as excinfo:
+            upsert_to_vector_db(
+                pinecone_client = mock_pinecone_client,
+                index_name = "test_index",
+                text_chunks = chunks,
+                dense_embeddings = dense,
+                sparse_embeddings = sparse
+            )
+
+        mock_pinecone_client.Index.assert_not_called()
+        assert "Dimension mismatch between text chunks and embedding vectors" in caplog.text
+        assert "Text Chunk Length: 3" in caplog.text
+        assert "Sparse Embedding Length: 1" in caplog.text
+        assert "Dimension mismatch between text chunks and embeddings." in str(excinfo.value)
+
+

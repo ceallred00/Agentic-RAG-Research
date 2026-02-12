@@ -428,11 +428,11 @@ def mock_full_KB_pipeline(valid_raw_data_dir, valid_processed_data_dir):
     but all external dependencies (Converter, Embedders, Chunker) are mocked.
     """
     # We patch the classes inside the pipeline module so __init__ uses our Mocks
-    with patch('src.knowledge_base.pipeline.knowledge_base_pipeline.ExecutionService') as MockExec, \
-         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.PDFToMarkdownConverter') as MockConverter, \
-         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.TextChunker') as MockChunker, \
-         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.GeminiEmbedder') as MockGemini, \
-         patch('src.knowledge_base.pipeline.knowledge_base_pipeline.PineconeSparseEmbedder') as MockPinecone:
+    with patch('knowledge_base.pipeline.knowledge_base_pipeline.ExecutionService') as MockExec, \
+         patch('knowledge_base.pipeline.knowledge_base_pipeline.PDFToMarkdownConverter') as MockConverter, \
+         patch('knowledge_base.pipeline.knowledge_base_pipeline.TextChunker') as MockChunker, \
+         patch('knowledge_base.pipeline.knowledge_base_pipeline.GeminiEmbedder') as MockGemini, \
+         patch('knowledge_base.pipeline.knowledge_base_pipeline.PineconeSparseEmbedder') as MockPinecone:
         
         pipeline = KnowledgeBasePipeline(
             kb_name="test_kb",
