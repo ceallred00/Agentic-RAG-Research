@@ -10,6 +10,7 @@ from langchain_core.documents import Document
 from typing import List, Optional, Tuple, Dict
 from constants import (
     PROCESSED_DATA_DIR,
+    RAW_DATA_DIR, # Used in example usage
     CHUNKING_SIZE,
     CHUNKING_OVERLAP,
     UWF_PUBLIC_KB_PROCESSED_DATE_DIR,
@@ -343,15 +344,15 @@ if __name__ == "__main__":  # pragma: no cover
     # Define files to test
     files_to_process = [
         # PDF / Raw Markdown File
-        # {
-        #     "name": "Graduate-Student-Handbook-2024-2025.md",
-        #     "path": Path(PROCESSED_DATA_DIR) / "Graduate-Student-Handbook-2024-2025.md"
-        # },
-        # Confluence Scraped File (YAML)
         {
-            "name": "Advising Syllabus",
-            "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Viewing_a_Degree_Audit.md",
-        }
+            "name": "Graduate-Student-Handbook-2024-2025.md",
+            "path": Path(PROCESSED_DATA_DIR) / "Graduate-Student-Handbook-2024-2025.md"
+        },
+        # Confluence Scraped File (YAML)
+        # {
+        #     "name": "Advising Syllabus",
+        #     "path": Path(UWF_PUBLIC_KB_PROCESSED_DATE_DIR) / "Advising_Syllabus.md",
+        # }
     ]
 
     print("\n=== STARTING CHUNKER TEST ===\n")
@@ -371,13 +372,15 @@ if __name__ == "__main__":  # pragma: no cover
 
             print(f"    Generated {len(chunks)} chunks.")
 
-            # Print preview of the first chunk to verify metadata injection
-            if chunks:
-                for chunk in chunks:
-                    print(f"\n\nChunk ID: {chunk.metadata.get('id')}")
-                    #print(f"Chunk Metadata: {chunk.metadata}")
-                    print(f"\n{chunk.page_content}")
+            truncated_chunks = chunks[20:25]
+            print(truncated_chunks)
 
+            # Print preview of the first chunk to verify metadata injection
+            # if truncated_chunks:
+            #     for chunk in truncated_chunks:
+            #         print(f"\n\nChunk ID: {chunk.metadata.get('id')}")
+            #         print(f"Chunk Metadata: {chunk.metadata}")
+            #         print(f"\n{chunk.page_content}")
         else:
             print(f"    [ERROR] File not found at: {f_path}")
 

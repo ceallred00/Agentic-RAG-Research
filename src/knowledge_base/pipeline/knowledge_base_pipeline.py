@@ -92,43 +92,68 @@ class KnowledgeBasePipeline:
 
         try:
             files = self._discover_files(source_dir=search_dir, source_type = source_type, specific_files= specific_files)
-
-            all_chunks = []
-            skipped_md_files = []
-
-            for file_path in files:
-                try:
-                    # If MD file already exists, returns file_path
-                    # Otherwise, it will load the PDF from self.raw_data_path arg and save to self.processed_data_path arg.
-                    md_path = self._ensure_markdown_exists(file_path = file_path, source_type=source_type)
-
-                    if not md_path:
-                        logger.warning(f"Skipping {file_path.name} due to conversion failure.")
-                        skipped_md_files.append(file_path)
-                        continue
-                    
-                    # Chunk files here
-                
-                except Exception as e:
-                    # Continue to iterate through list
-                    logger.error(f"Failed to process file {file_path.name}: {e}", exc_info = True)
-            
-            if not all_chunks:
-                logger.error("Pipeline finished with no chunks generated. Exiting")
-                return
-
-            if skipped_md_files:
-                logger.warning(f"{len(skipped_md_files)} files were skipped. File names: {skipped_md_files}")
-            
-            logger.info(f"Successfully chunked {len(all_chunks)} files.")
-
-            # Embed and Upsert Files Here
-        
-            logger.info("Pipeline completed successfully.")
+        except (ValueError, FileNotFoundError, PermissionError) as e:
+            logger.error(f"Pipeline execution stopped: {e}")
+            raise
         
         except Exception as e:
-            logger.critical(f"Critical Pipeline Failure: {e}", exc_info = True)
+            logger.error(f"Critical error during file discovery: {e}", exc_info = True)
             raise
+
+        all_chunks = []
+        skipped_md_files = []
+        error_files = []
+
+        for file_path in files:
+            try:
+                # If MD file already exists, returns file_path
+                # Otherwise, it will load the PDF from self.raw_data_path arg and save to self.processed_data_path arg.
+                md_path = self._ensure_markdown_exists(file_path = file_path, source_type=source_type)
+
+                if not md_path:
+                    logger.warning(f"Skipping {file_path.name} due to conversion failure.")
+                    skipped_md_files.append(file_path)
+                    continue
+                
+                try:
+                    with open(md_path, 'r', encoding = 'utf-8') as f:
+                        text_content = f.read()
+                    
+                    file_chunks = self.chunker.split_text(text = text_content, source_name = md_path.name)
+
+                    if not file_chunks:
+                        logger.warning(f"No chunks generated for file: {md_path.name}")
+                        continue
+                    
+                    # File chunks already include enriched content and all necessary metadata (id, version, content, enriched content, etc.)
+                    all_chunks.extend(file_chunks)
+                
+                except Exception as e:
+                    logger.error(f"Error processing text/chunking for {md_path.name}: {e}", exc_info=True)
+                    error_files.append(md_path.name)
+                    continue
+            
+            except Exception as e:
+                # Continue to iterate through list
+                logger.error(f"Failed to process file {file_path.name}: {e}", exc_info = True)
+        
+        if not all_chunks:
+            logger.error("Pipeline finished with no chunks generated. Exiting")
+            return
+
+        if skipped_md_files:
+            logger.warning(f"{len(skipped_md_files)} files were skipped. File names: {skipped_md_files}")
+        if error_files:
+            logger.warning(f"Errors processing {len(error_files)} files. File names: {error_files}")
+        
+        logger.info(f"Files Discovered: {len(files)}")
+        logger.info(f"Successfully chunked {len(files)-len(skipped_md_files)-len(error_files)} files.")
+        logger.info(f"Total chunks: {len(all_chunks)}")
+
+        # Embed and Upsert Files Here
+    
+        logger.info("Pipeline completed successfully.")
+        return all_chunks
 
     def _discover_files(self, source_dir: Path, source_type: SourceType, specific_files: Optional[List[str]]) -> List[Path]:
         """
@@ -264,8 +289,23 @@ class KnowledgeBasePipeline:
 
 if __name__ == "__main__": # pragma: no cover
     pipeline = KnowledgeBasePipeline(kb_name = "test",
-                          processed_data_path = UWF_PUBLIC_KB_PROCESSED_DATE_DIR)
-    print(pipeline.run(
-                          source_type = SourceType.MARKDOWN,
-                          specific_files = None
-                          ))
+                          processed_data_path = UWF_PUBLIC_KB_PROCESSED_DATE_DIR, raw_data_path= RAW_DATA_DIR)
+    # chunks = pipeline.run(
+    #                       source_type = SourceType.MARKDOWN,
+    #                       specific_files = ["Advising_Syllabus.md", "Viewing_a_Degree_Audit.md"]
+    #                       )
+    # truncated_chunks = chunks[0:5] + chunks[40:45]
+
+    # for chunk in truncated_chunks:
+    #         print(f"\n\nChunk ID: {chunk.metadata.get('id')}")
+    #         print(f"Chunk Metadata: {chunk.metadata}")
+    #         print(f"\n{chunk.page_content}")
+
+    files = ['Phishing_Defense_Test_Simulation.md', 'Eduroam_Setup_Instructions_Chromebook.md', 'Eduroam_Setup_Instructions_Windows_11.md', 'How_to_Create_a_Profile_on_the_RecWell_Fusion_Portal_and_Sign_the_Release_of_Liability_Form_Community_Members.md', 'Eduroam_Setup_Instructions_macOS.md']
+    
+    chunks = pipeline.run(
+        source_type = SourceType.MARKDOWN,
+        specific_files = files
+    )
+
+    print(len(chunks))

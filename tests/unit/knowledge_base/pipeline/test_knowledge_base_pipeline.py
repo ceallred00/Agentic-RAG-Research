@@ -28,6 +28,7 @@ class TestKnowledgeBasePipeline:
         def test_successful_pipeline(self):
             pass
         def test_unsupported_source_type(self, mock_full_KB_pipeline):
+            mock_full_KB_pipeline._discover_files = MagicMock()
             # Assert ValueError is raised if unsupported source type passed.
             with pytest.raises(ValueError) as excinfo:
                 mock_full_KB_pipeline.run(
@@ -36,6 +37,33 @@ class TestKnowledgeBasePipeline:
                 )
             
             assert "Unsupported SourceType" in str(excinfo.value)
+            mock_full_KB_pipeline._discover_files.assert_not_called()
+
+        @pytest.mark.parametrize("error_type, error_msg", [
+            (ValueError, "No files found"), 
+            (FileNotFoundError, "Directory does not exist"),
+            (PermissionError, "Access denied"),
+        ])
+        def test_file_discovery_error(self, mock_full_KB_pipeline, error_msg, error_type):
+            """
+            Ensures that the run method re-raises expected discovery errors (Fail Fast).
+            
+            Verifies that when _discover_files raises a handled exception, the pipeline:
+            1. Logs an error message for observability.
+            2. Re-raises the exception to stop the pipeline immediately.
+            """
+            mock_full_KB_pipeline._ensure_markdown_exists = MagicMock()
+            
+            mock_full_KB_pipeline._discover_files = MagicMock(side_effect = error_type(error_msg))
+
+            with pytest.raises(error_type) as excinfo:
+                results = mock_full_KB_pipeline.run(
+                    source_type = SourceType.PDF,
+                    specific_files = None
+                )
+            
+            assert error_msg in str(excinfo.value)
+            mock_full_KB_pipeline._ensure_markdown_exists.assert_not_called()
     
     class TestDiscoverFiles:
         @pytest.mark.parametrize("source_type, file_ext", [

@@ -89,6 +89,9 @@ if __name__ == "__main__":  # pragma: no cover
     processor = PDFToMarkdownConverter()
 
     handbook = processor.load_pdf_as_markdown(file_name)
+
+    content = "\n\n".join([d.page_content for d in handbook])
     print(len(handbook))
+    processor.save_markdown_file(content = content, output_filename = "Graduate-Student-Handbook-2024-2025.md")
     #if handbook:
         #processor.save_markdown_file(handbook[0].page_content, file_name)
