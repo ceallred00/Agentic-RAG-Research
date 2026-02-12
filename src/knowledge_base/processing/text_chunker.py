@@ -215,8 +215,6 @@ class TextChunker:
                 'url': '',
                 'parent': 'Document Library',
                 'breadcrumbs': 'Source: Document Library / Graduate Student Handbook 2024 2025 | Headers: THE DEPARTMENT OF MATHEMATICS AND STATISTICS > Program Overview',
-                'version': None,
-                'last_updated': None,
                 'text': 'Context:\n...\n---\n## Program Overview  \nThe Master of Science in Mathematical Sciences...'
                 'original_content': '## Program Overview  \nThe Master of Science in Mathematical Sciences...'
             }
@@ -317,8 +315,7 @@ class TextChunker:
             new_content = f"Context:\n{context_str}\n---\n{doc.page_content}"
 
             # Update metadata (For database filtering)
-            doc.metadata.update(
-                {
+            metadata_update = {
                     "id": chunk_id,
                     "source": doc_title,
                     "url": doc_url,
@@ -326,12 +323,16 @@ class TextChunker:
                     "breadcrumbs": context_str.replace(
                         "\n", " | "
                     ),  # Easily returns source information to frontend (more customizable than raw enriched content)
-                    "version": doc_version,
-                    "last_updated": doc_last_updated_readable,
                     "text": new_content,  # Gives RAG LLM access to source path, header hierarchy, versioning info, date of last update, in addition to raw context.
                     "original_content": doc.page_content,  # Keep pure content for LLM to return to the user (doesn't require second DB lookup for content)
-                }
-            )
+            }
+
+            if doc_version is not None:
+                metadata_update["version"] = doc_version
+            if doc_last_updated_readable is not None:
+                metadata_update["last_updated"] = doc_last_updated_readable
+
+            doc.metadata.update(metadata_update)
 
             doc.page_content = new_content
             enriched_docs.append(doc)

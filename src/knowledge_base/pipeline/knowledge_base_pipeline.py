@@ -377,8 +377,8 @@ class KnowledgeBasePipeline:
                 logger.error(f"Failed to export chunks: {e}")
 
 if __name__ == "__main__": # pragma: no cover
-    pipeline = KnowledgeBasePipeline(kb_name = "test",
-                          processed_data_path = UWF_PUBLIC_KB_PROCESSED_DATE_DIR, raw_data_path= RAW_DATA_DIR)
+    pipeline = KnowledgeBasePipeline(kb_name = "uwf-kb-1",
+                          processed_data_path = PROCESSED_DATA_DIR, raw_data_path= RAW_DATA_DIR)
     # chunks = pipeline.run(
     #                       source_type = SourceType.MARKDOWN,
     #                       specific_files = ["Advising_Syllabus.md", "Viewing_a_Degree_Audit.md"]

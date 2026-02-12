@@ -104,8 +104,7 @@ class TestEnrichMetadata:
                 "id_prefix": "graduate_handbook",  # Cleaned filename
                 "meta_source": "Graduate Handbook",  # Cleaned title in metadata
                 "content_breadcrumb": "Document Library / Graduate Handbook",
-                "last_updated": None,  # PDF files not expected to have update date
-                "version": None,
+                "has_versioning": False,  # PDF files: version/last_updated keys should be absent from metadata
                 "is_anonymous": False,
             },
         },
@@ -116,8 +115,7 @@ class TestEnrichMetadata:
                 "id_prefix": "anon_",  # Hash fallback
                 "meta_source": "Unknown Document",  # Cleaned title in metadata - Uses default
                 "content_breadcrumb": "Unknown Document",  # No parent for file
-                "last_updated": None,  # PDF files not expected to have update date
-                "version": None,
+                "has_versioning": False,  # Anonymous files: version/last_updated keys should be absent from metadata
                 "is_anonymous": True,
             },
         },
@@ -139,6 +137,7 @@ class TestEnrichMetadata:
                 "id_prefix": "42669534",  # Page ID becomes root
                 "meta_source": "Advising Syllabus",
                 "content_breadcrumb": "UWF Public Knowledge Base / Academic Advising / Advising Syllabus",
+                "has_versioning": True,
                 "last_updated": "2022-04-12",  # Expecting clean YYYY-MM-DD
                 "version": "34",
                 "is_anonymous": False,
@@ -182,8 +181,15 @@ class TestEnrichMetadata:
         assert first_doc.metadata["id"] != second_doc.metadata["id"]
 
         assert first_doc.metadata.get("source") == expects["meta_source"]
-        assert first_doc.metadata.get("version") == expects["version"]
-        assert first_doc.metadata.get("last_updated") == expects["last_updated"]
+
+        if expects["has_versioning"]:
+            # Confluence pages: version and last_updated should be present in metadata
+            assert first_doc.metadata["version"] == expects["version"]
+            assert first_doc.metadata["last_updated"] == expects["last_updated"]
+        else:
+            # PDF/Anonymous: version and last_updated keys should be absent from metadata entirely
+            assert "version" not in first_doc.metadata
+            assert "last_updated" not in first_doc.metadata
 
         if expects["is_anonymous"]:
             # Verify we are using the hash logic (13+ chars)
@@ -197,16 +203,16 @@ class TestEnrichMetadata:
         assert expected_line in first_doc.metadata["breadcrumbs"]
         assert expected_line in second_doc.metadata["breadcrumbs"]
 
-        if expects["last_updated"]:
+        if expects["has_versioning"]:
             assert f"Last Updated: {expects['last_updated']}" in first_doc.page_content
             assert f"Last Updated: {expects['last_updated']}" in second_doc.page_content
             assert f"Version: {expects['version']}" in first_doc.page_content
             assert f"Version: {expects['version']}" in second_doc.page_content
 
         else:
-            # Verify we didn't inject "None" or empty strings into the text
-            assert "Last Updated: None" not in first_doc.page_content
-            assert "Last Updated: None" not in second_doc.page_content
+            # Verify versioning info is not injected into content
+            assert "Last Updated:" not in first_doc.page_content
+            assert "Last Updated:" not in second_doc.page_content
             assert "Version:" not in first_doc.page_content
             assert "Version:" not in second_doc.page_content
 
