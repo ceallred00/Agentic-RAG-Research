@@ -6,6 +6,7 @@ from enum import Enum
 from typing import List, Optional, Union
 
 from core.execution_service import ExecutionService
+from core.logging_setup import setup_logging # Used for main entry
 from knowledge_base.ingestion.pdf_to_markdown_converter import PDFToMarkdownConverter
 from knowledge_base.processing.text_chunker import TextChunker
 from knowledge_base.processing.pinecone_sparse_embedder import PineconeSparseEmbedder
@@ -377,8 +378,9 @@ class KnowledgeBasePipeline:
                 logger.error(f"Failed to export chunks: {e}")
 
 if __name__ == "__main__": # pragma: no cover
+    setup_logging()
     pipeline = KnowledgeBasePipeline(kb_name = "uwf-kb-1",
-                          processed_data_path = PROCESSED_DATA_DIR, raw_data_path= RAW_DATA_DIR)
+                          processed_data_path = UWF_PUBLIC_KB_PROCESSED_DATE_DIR, raw_data_path= RAW_DATA_DIR)
     # chunks = pipeline.run(
     #                       source_type = SourceType.MARKDOWN,
     #                       specific_files = ["Advising_Syllabus.md", "Viewing_a_Degree_Audit.md"]
@@ -394,7 +396,7 @@ if __name__ == "__main__": # pragma: no cover
     
     chunks = pipeline.run(
         source_type = SourceType.MARKDOWN,
-        specific_files = None
+        specific_files = ["Zoom_Phone_Billing_Guidelines.md"]
     )
 
     
