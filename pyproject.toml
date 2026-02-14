@@ -24,17 +24,19 @@ dependencies = [
     "langchain-openai>=1.1.7",        # Interface for OpenAI GPT models + EdenAI models
     
     # --- Vector Database & Embeddings ---
-    "pinecone>=7.3.0",                # Pinecone Vector Database client + Pinecone sparse embedding model
-    "langchain-pinecone>=0.2.13",     # LangChain integration for Pinecone
+    "pinecone[grpc]>=7.3.0",          # Pinecone Vector Database client + gRPC for PineconeGRPC
     "langchain-text-splitters>=1.1.0",# Tools for chunking text for embedding
     "numpy>2.0.0",                    # Used for normalizing vector embeddings
 
     # --- Document Processing & Ingestion ---
     "langchain-docling>=2.0.0",       # PDF parsing for KB
-    "opencv-python>=4.13",            
     "requests>=2.32.5",               # HTTP client for API calls (Confluence page tree scraping)
-
-    "tenacity>=9.1.2",
+    "python-frontmatter>=1.1.0",      # YAML frontmatter parsing for Confluence markdown files
+    "beautifulsoup4>=4.12.0",         # HTML parsing for Confluence content extraction
+    "lxml>=5.0.0",                    # Fast HTML/XML parser backend for BeautifulSoup
+    "markdownify>=0.13.0",            # Converts HTML to Markdown (Confluence pages)
+    "regex>=2024.0.0",                # Advanced regex engine for Confluence content cleanup
+    "google-genai>=1.0.0",            # Google GenAI SDK (error types used in base_agent)
 ]
 
 [project.optional-dependencies]

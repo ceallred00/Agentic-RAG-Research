@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 execution_service = ExecutionService()
-perform_rag_tool = get_perform_rag_tool(execution_service, index_name="university-handbook-kb")
+perform_rag_tool = get_perform_rag_tool(execution_service, index_name="uwf-kb-1")
 
 # TODO: Move tools to their own .py files and finalize.
 
