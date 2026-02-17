@@ -12,8 +12,8 @@ class EvalDatasetRow(BaseModel):
     """
     Represents a single evaluation sample with a question and its ground truth answer
     """
-    question: Annotated[str, Field(description = "Natural language query to evaluate retrieval against.")]
-    ground_truth_answer: Annotated[str, Field(description = "Expected correct answer used by RAGAS to judge context recall.")]
+    question: Annotated[str, Field(min_length=1,description = "Natural language query to evaluate retrieval against.")]
+    ground_truth: Annotated[str, Field(min_length=1, description = "Expected correct answer used by RAGAS to judge context recall.")]
 
 class RetrievalResult(BaseModel):
     """

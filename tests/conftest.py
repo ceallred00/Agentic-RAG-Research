@@ -19,6 +19,7 @@ from knowledge_base.ingestion.url_to_md_converter import URLtoMarkdownConverter
 from knowledge_base.processing.text_chunker import TextChunker
 from knowledge_base.pipeline.knowledge_base_pipeline import KnowledgeBasePipeline
 
+from rag_eval.evaluation_dataset_loader import EvaluationDatasetLoader
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
 #    - Basic dictionaries and configuration data used across tests.
@@ -502,3 +503,30 @@ def confluence_processor(valid_processed_data_dir):
 @pytest.fixture
 def confluence_html_extractor():
     return ConfluenceContentExtractor()
+
+# ==============================================================================
+# 6. RAG EVALUATION INSTANCES + FIXTURES
+# ==============================================================================
+
+@pytest.fixture
+def rag_dataset_loader(valid_data_dir):
+    loader = EvaluationDatasetLoader(csv_dir= valid_data_dir,
+                                     encoding = 'utf-8')
+    
+    return loader
+
+@pytest.fixture
+def valid_csv_filepath(valid_data_dir):
+    csv_filepath = Path(valid_data_dir / "test.csv")
+    csv_filepath.touch()
+    return csv_filepath
+
+@pytest.fixture
+def valid_csv_file(valid_csv_filepath):
+    valid_csv_filepath.write_text(                                                         
+          "question,ground_truth\n"                                                                                                                                                                                                              
+          "What is the deadline for dropping a class?,The last day to drop without a W is August 25th.\n"                                                                                                                                      
+          "How do I apply for financial aid?,Submit FAFSA by June 30th.\n"                                                                                                                                                                       
+          "Where is the library?,The John C. Pace Library is located on the main campus.\n"                                                                                                                                                      
+      )
+    return valid_csv_filepath
