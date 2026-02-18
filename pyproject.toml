@@ -40,6 +40,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+eval = [
+    "ragas>=0.4.0",                   # RAGAS framework for RAG retrieval evaluation metrics
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=3.0.0",
