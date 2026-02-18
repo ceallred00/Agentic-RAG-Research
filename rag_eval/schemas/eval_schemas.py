@@ -42,6 +42,7 @@ class EvalReport(BaseModel):
     total_questions_evaluated: Annotated[int, Field(description = "Number of questions evaluated.")]
     dataset_name: Annotated[str, Field(description = "Name of evaluated dataset.")]
     per_question_results: Annotated[List[QuestionEvalResult], Field(description = "Per-question results, including the question, context and precision scores, and the retrieved contexts.")]
+    description: Annotated[str, Field(description = "Brief description of the evaluation run (e.g., 'Baseline hybrid search, top_k=5')")]
 
 
 class EvalAgentState(TypedDict):

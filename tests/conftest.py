@@ -20,6 +20,8 @@ from knowledge_base.processing.text_chunker import TextChunker
 from knowledge_base.pipeline.knowledge_base_pipeline import KnowledgeBasePipeline
 
 from rag_eval.evaluation_dataset_loader import EvaluationDatasetLoader
+from rag_eval.report_generator import ReportGenerator
+from rag_eval.schemas.eval_schemas import EvalReport, QuestionEvalResult
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
 #    - Basic dictionaries and configuration data used across tests.
@@ -530,3 +532,32 @@ def valid_csv_file(valid_csv_filepath):
           "Where is the library?,The John C. Pace Library is located on the main campus.\n"                                                                                                                                                      
       )
     return valid_csv_filepath
+
+@pytest.fixture
+def report_generator_instance(valid_data_dir):
+    instance = ReportGenerator(output_dir= valid_data_dir)
+    return instance
+
+@pytest.fixture                                                                                                                                                                                                                                
+def sample_eval_report():                                                                                           
+    return EvalReport(                                                                                                                                                                                                                         
+        average_context_recall=0.85,                                                                                                                                                                                                         
+        average_context_precision=0.90,                                                                                                                                                                                                        
+        total_questions_evaluated=2,                                                                                                                                                                                                         
+        dataset_name="test_dataset.csv",                                                                                                                                                                                                       
+        description="Baseline hybrid search, top_k=5",                                                                                                                                                                                         
+        per_question_results=[
+            QuestionEvalResult(
+                question="What is the deadline for dropping a class?",
+                context_precision=0.92,
+                context_recall=0.88,
+                contexts=["The last day to drop without a W is August 25th.", "Drop/Add period ends on the first week."]
+            ),
+            QuestionEvalResult(
+                question="How do I apply for financial aid?",
+                context_precision=0.88,
+                context_recall=0.82,
+                contexts=["Submit FAFSA by June 30th.", "Financial aid office is located in Building 20."]
+            ),
+        ]
+    )
