@@ -22,6 +22,9 @@ from knowledge_base.pipeline.knowledge_base_pipeline import KnowledgeBasePipelin
 from rag_eval.evaluation_dataset_loader import EvaluationDatasetLoader
 from rag_eval.report_generator import ReportGenerator
 from rag_eval.schemas.eval_schemas import EvalReport, QuestionEvalResult
+
+from tools.rag_retriever import RagRetriever
+from tools.perform_rag_tool import PerformRagTool
 # ==============================================================================
 # 1. CONSTANTS & DATA FIXTURES
 #    - Basic dictionaries and configuration data used across tests.
@@ -561,3 +564,43 @@ def sample_eval_report():
             ),
         ]
     )
+
+# ==============================================================================                                                                                                                                                               
+# 7. RAG RETRIEVER FIXTURES                                                                                                                                                                                                                    
+# ==============================================================================     
+
+@pytest.fixture                                                                                                                                                                                                                                
+def mock_dense_embedder():                                                                                                                                                                                                                     
+    return MagicMock()                                                                                                                                                                                                                         
+                                                                                                                                                                                                                                                
+@pytest.fixture                                                                                                                                                                                                                                
+def mock_sparse_embedder():                                                                                                                                                                                                                  
+    return MagicMock()
+
+@pytest.fixture
+def mock_pc_client(mock_index_object):
+    client = MagicMock()
+    client.Index.return_value = mock_index_object
+    return client
+
+@pytest.fixture
+def rag_retriever(mock_dense_embedder, mock_sparse_embedder, mock_pc_client):
+    return RagRetriever(
+        dense_embedder=mock_dense_embedder,
+        sparse_embedder=mock_sparse_embedder,
+        pc_client=mock_pc_client,
+        index_name="test-index"
+    )
+
+@pytest.fixture
+def mock_pinecone_matches():
+    """Simulates Pinecone ScoredVector objects returned from index.query()."""
+    match1 = MagicMock()
+    match1.metadata = {"text": "The last day to drop without a W is August 25th."}
+    match1.score = 0.89
+
+    match2 = MagicMock()
+    match2.metadata = {"text": "Drop/Add period ends on the first week."}
+    match2.score = 0.75
+
+    return [match1, match2]

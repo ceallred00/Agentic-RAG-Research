@@ -128,6 +128,7 @@ class PineconeSparseEmbedder:
                     all_embeddings.extend(batch_embeddings)
                     logger.info(f"Batch {batch_num}/{total_batches} complete (after retry).")
                 else:
+                    logger.error(f"Pinecone API exception: {e}")
                     raise
             except Exception as e:
                 error_msg = f"Error generating sparse embeddings with Pinecone for batch {batch_num}/{total_batches}: {e}"
@@ -136,6 +137,8 @@ class PineconeSparseEmbedder:
             time.sleep(0.5)
 
         return all_embeddings
+
+    # TODO: Move to separate function to reduce redundant code between embedders.
 
     def _batch_texts(self, texts: List[str], batch_size: int):
         """Splits the list of texts into smaller batches."""

@@ -2,11 +2,10 @@ import logging
 from typing import Type, List, Any
 from pydantic import BaseModel, Field, PrivateAttr
 from langchain_core.tools import BaseTool
-from langchain_core.documents import Document
+from tools.rag_retriever import RagRetriever
+from core.execution_service import ExecutionService
 from knowledge_base.processing.gemini_embedder import GeminiEmbedder
 from knowledge_base.processing.pinecone_sparse_embedder import PineconeSparseEmbedder
-from pinecone.grpc import PineconeGRPC
-from core.execution_service import ExecutionService
 
 logger = logging.getLogger(__name__)
 
@@ -19,96 +18,38 @@ class RagSearchInput(BaseModel):
 
 class PerformRagTool(BaseTool):
     """
-    Performs a RAG (Retrieval-Augmented Generation) search over a knowledge base.
+    Performs a RAG search over a knowledge base.
     Embeds the user query (dense + sparse) and retrieves relevant documents from the Pinecone index.
     """
 
     name: str = "perform_rag_search"
-    description: str = """Searches the University of West Florida knowledge base for context relevant 
+    description: str = """Searches the University of West Florida knowledge base for context relevant
     to the user's query using RAG. Use this to answer UWF-specific questions about policies, courses, or campus life."""
     args_schema: Type[BaseModel] = RagSearchInput
 
     # Dependency injection
-    # Private attributes to hold the embedder instances, Pinecone client, and index name.
-    # All are hidden from LLM serialization.
-    _dense_embedder: GeminiEmbedder = PrivateAttr()
-    _sparse_embedder: PineconeSparseEmbedder = PrivateAttr()
-    _pc_client: PineconeGRPC = PrivateAttr()
-    _index_name: str = PrivateAttr()
+    # Private attributes to hold retriever instances
+    # Hidden from LLM serialization.
+    _retriever: RagRetriever = PrivateAttr()
 
-    def _run(self, user_query: str) -> str:
+    def _run(self, user_query: str, top_k_matches: int = 5) -> str:
         """
-        Executes the Hybrid RAG (Retrieval-Augmented Generation) pipeline for a given user query.
-
-        This method performs the following steps:
-        1.  Embeds the user query into both Dense (semantic) and Sparse (keyword) vectors
-            using the configured Gemini and Pinecone embedders.
-        2.  Queries the Pinecone index using Hybrid Search (Dense + Sparse) to retrieve
-            the top 5 most relevant document chunks.
-        3.  Formats the retrieved matches into a single context string using `_format_results`.
+        Delegates hybrid RAG retrieval to `RagRetriever` and formats the results
+        into a context string for the LLM.
 
         Args:
             user_query (str): The natural language question or search phrase provided by the user.
                               Example: "What is the deadline for dropping a class?"
+            top_k_matches (int): Number of top results to retrieve from Pinecone. Defaults to 5.
 
         Returns:
             str: A formatted string containing the content of the retrieved documents,
                  ready to be passed to the LLM as context.
-                 Returns a "No matches found" message if retrieval fails or yields no results.
-
-        Raises:
-            Exception: Captures and logs any errors during embedding or retrieval, returning
-                       a user-friendly error string to the LLM to prevent a crash.
         """
         logger.info(f"Tool '{self.name} processing query: '{user_query}'")
-        try:
-            dense_vector = self._dense_embedder.embed_dense_query(user_query)
-            logger.info(f"Successfully generated dense embedding of length {len(dense_vector)}")
+        matches = self._retriever.retrieve_RAG_matches(user_query = user_query, top_k_matches = top_k_matches)
 
-        except Exception as e:
-            logger.error(f"Error generating dense embeddings {self.name}: {e}")
-            raise e
-
-        try:
-            sparse_vector = self._sparse_embedder.embed_sparse_query(user_query)
-
-            curr_sparse = sparse_vector[0] if isinstance(sparse_vector, list) else sparse_vector
-            logger.info(
-                f"Successfully generated sparse embeddings. Indices length: {len(curr_sparse.sparse_indices)}, Values length: {len(curr_sparse.sparse_values)}"
-            )
-
-        except Exception as e:
-            logger.error(f"Error generating sparse embeddings {self.name}: {e}")
-            raise e
-
-        index = self._pc_client.Index(self._index_name)
-
-        try:
-            response = index.query(
-                top_k=5,
-                vector=dense_vector,
-                sparse_vector={
-                    "indices": curr_sparse.sparse_indices,
-                    "values": curr_sparse.sparse_values,
-                },
-                include_values=False,  # Does not return vector values
-                include_metadata=True,  # Returns metadata for context
-            )
-
-            matches = response.matches  # type: ignore
-            if matches:
-                logger.info(
-                    f"Query to Pinecone index '{self._index_name}' successful. Retrieved {len(matches)} matches."
-                )
-
-            return self._format_results(matches)
-
-        except Exception as e:
-            logger.error(
-                f"Error querying Pinecone index '{self._index_name}': {e}",
-                exc_info=True,
-            )
-            return f"Error performing RAG search: {e}"
+        return self._format_results(matches)
 
     def _format_results(self, matches: List[Any]) -> str:
         """
@@ -164,17 +105,15 @@ def get_perform_rag_tool(execution_service: ExecutionService, index_name: str) -
     """
     Factory function to instantiate and configure the `PerformRagTool`.
 
-    This function implements the Dependency Injection pattern to initialize the tool
-    with complex services (ExecutionService, Embedders, Pinecone Client) that cannot
-    be passed directly to the Pydantic `__init__` method.
-
-    It creates a blank instance of `PerformRagTool` and manually injects the
-    dependencies into its private attributes (`_dense_embedder`, `_pc_client`, etc.).
+    Creates a `RagRetriever` (with dense/sparse embedders and a Pinecone client)
+    and injects it into the tool's private `_retriever` attribute. This Dependency
+    Injection pattern is required because Pydantic's `__init__` (used by BaseTool)
+    cannot accept complex service objects directly.
 
     Args:
         execution_service (ExecutionService): The central service factory used to create
                                               authenticated clients for Gemini and Pinecone.
-        index_name (str): The name of the Pinecone index to be queried (e.g., "uwf-kb-v1").
+        index_name (str): The name of the Pinecone index to be queried (e.g., "uwf-kb-1").
 
     Returns:
         PerformRagTool: A fully configured instance of the tool, ready to be bound
@@ -182,9 +121,13 @@ def get_perform_rag_tool(execution_service: ExecutionService, index_name: str) -
     """
     tool = PerformRagTool()
 
-    tool._dense_embedder = GeminiEmbedder(execution_service)
-    tool._sparse_embedder = PineconeSparseEmbedder(execution_service)
-    tool._pc_client = execution_service.get_pinecone_client()
-    tool._index_name = index_name
+    retriever = RagRetriever(
+        dense_embedder = GeminiEmbedder(execution_service),
+        sparse_embedder= PineconeSparseEmbedder(execution_service),
+        pc_client = execution_service.get_pinecone_client(),
+        index_name = index_name
+    )
+
+    tool._retriever = retriever
 
     return tool

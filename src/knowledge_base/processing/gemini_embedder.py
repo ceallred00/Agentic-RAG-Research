@@ -112,6 +112,8 @@ class GeminiEmbedder:
 
         return normalized_embeddings  # type: ignore
 
+    # TODO: Add error handling here.
+
     def embed_dense_query(self, query: str) -> List[float]:
         """
         Generates embeddings for a user search query.
@@ -140,6 +142,8 @@ class GeminiEmbedder:
         normalized_batch = VectorNormalizer.normalize([raw_embeddings], VectorType.DENSE)
         logger.info(f"Normalized {len(normalized_batch)} dense embeddings for query.")
         return normalized_batch[0]  # type: ignore
+
+    # TODO: Move to separate function to reduce redundant code between embedders.
 
     def _batch_texts(self, texts: List[str], batch_size: int):
         """Helper to split a list of texts into smaller batches."""
