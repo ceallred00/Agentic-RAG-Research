@@ -1,149 +1,265 @@
 # AI Agents Project
 Building and testing different AI agents and agentic system architectures.
 
-## Overview 
-This repository provides a lightweight framework for defining, configuring, testing, and benchmarking different agent types and multi-agent system architectures. The code emphasizes clear separation between agent implementations, configurations, and architecture coordination.
+## Overview
+This repository provides a framework for defining, configuring, testing, and benchmarking AI agents and multi-agent system architectures. The primary application is a UWF student assistant that uses Retrieval-Augmented Generation (RAG) to answer questions from a university knowledge base.
 
 Key concepts:
-- **Agent**: An individual unit 
+- **Agent**: An individual unit that reasons and acts using tools.
 - **Architecture**: Orchestrates one or more agents, defines communication & coordination, and may include central or distributed planning logic — implemented in `src/architectures/`.
-- **Configuration**: YAMLfiles that set model parameters, tools, memory, and behavior policies for agents and architectures (in `configs/`).
+- **Configuration**: YAML files that set model parameters, tools, memory, and behavior policies for agents and architectures (in `configs/`).
+- **Knowledge Base**: A RAG pipeline that ingests documents, chunks and embeds them, and uploads vectors to Pinecone for hybrid (dense + sparse) retrieval.
+- **RAG Evaluation**: A module for benchmarking retrieval quality using RAGAS metrics.
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a deeper look at design decisions.
 
-## Project Structure 
+---
 
-* **`configs/`**:
-    * `agents/`: YAML definitions for agents.
-    * `architectures/`: YAML definitions for architectures.
-* **`src/`**: Source code.
-    * `agents/`: Agent implementations.
-        * `base_agent.py`: **Active**. Single ReACT agent with tool support.
-        * `coordination_agent.py`: Placeholder file for specialized agent (WIP).
-        * `email_agent.py`: Placeholder file for specialized agent (WIP).
-        * `rag_agent.py`: Placeholder file for specialized agent (WIP).
-        * `web_search_agent.py`: Placeholder file for specialized agent (WIP).
-    * `architectures/`: Logic for multi-agent orchestration (WIP).
-    * `core`: Application infrastructure
-        * `logging_setup.py`: Sets the logging configuration for the application.
-        * `execution_service.py`: Creates LLM client based upon specified configuration file.
-        * `architecture_manager.py`: (WIP)
-        * `state.py`: Defines standard information included in Agent State during execution.
-    * `utils`: Core utility files.
-        * `application_streamer.py`: Streams the provided application graph one node at a time, streaming intermediate state. Used when executing the agent(s).
-        * `architecture_diagram_generator.py`: Generates diagram of graph architecture. 
-        * `config_loader.py`: Parses YAML files and validates against Pydantic models. Options available for both agent YAML files and architecture YAML files.
-        * `process_events.py`: Accesses the tool calls and AI agent's responses to display to the user.
-    * `knowledge_base`: RAG pipeline including PDF ingestion, chunking logic, embedding, and uploading to Vector DB (WIP).
-        * `ingestion`:
-            * `pdf_to_markdown_converter.py`: Uses Docling to convert PDF files to markdown.
-        * `processing`:
-            * `text_chunker.py`: Splits .md files on headers, then recursively chunks the headers into the specified size. 
-            * `gemini_embedder.py`: (WIP).s
-        * `uploading_to_vector_db`:
-    * `schemas/`: Pydantic models enforcing validation rules.'
-        * `agent_schemas.py`: Pydantic model for agent .YAML configuration files. 
-        * `architecture_schemas.py`: Pydantic model for architecture .YAML configuration files.
-    * `constants.py`: Contains constants used throughout SRC folder. Includes directory file paths.
-    * `main.py`: FUTURE USE - Main entry point for the application (WIP).
-* **`tests/`**: Test code.
-    * `integration`: Contains integration tests.
-    * `unit`: Contains unit tests (WIP).
-        * `agents`: Unit tests for agent files.
-        * `architecture`: Unit tests for architecture files.
-        * `core`: Unit tests for core infrastructure.
-        * `utils`: Unit tests for utility functions. 
-        * `knowledge_base`: Unit tests for RAG pipeline.
-    * `conftest.py`: Contains PyTest configurations and reusable fixtures.
-* **`diagrams/`**: 
-    * `production`: Contains graph diagrams for each agent configuration.
+## Project Structure
 
-See ARCHITECTURE.md for more information on project architecture.
+```
+.
+├── configs/
+│   ├── agents/                     # YAML definitions for individual agents
+│   │   ├── base_agent.yaml         # Active ReACT agent configuration
+│   │   ├── rag_agent.yaml
+│   │   ├── coordination_agent.yaml
+│   │   ├── email_agent.yaml
+│   │   └── web_search_agent.yaml
+│   └── architectures/              # YAML definitions for multi-agent architectures (WIP)
+│
+├── src/
+│   ├── agents/                     # Agent implementations
+│   │   ├── base_agent.py           # Active. ReACT agent with 6 tools (RAG, web search, email, advisor lookup).
+│   │   ├── rag_agent.py            # Placeholder — WIP
+│   │   ├── coordination_agent.py   # Placeholder — WIP
+│   │   ├── web_search_agent.py     # Placeholder — WIP
+│   │   └── email_agent.py          # Placeholder — WIP
+│   │
+│   ├── architectures/              # Multi-agent orchestration logic (WIP)
+│   │
+│   ├── core/                       # Application infrastructure
+│   │   ├── execution_service.py    # Factory for creating LLM, embedding, and vector DB clients.
+│   │   ├── agent_state.py          # Defines AgentState TypedDict with message history.
+│   │   ├── logging_setup.py        # Dual logging: file handler (DEBUG) + console handler (WARNING).
+│   │   └── architecture_manager.py # Orchestrates multi-agent architectures (WIP).
+│   │
+│   ├── tools/                      # LangGraph tool implementations
+│   │   └── perform_rag_tool.py     # Hybrid RAG search (dense + sparse) over the Pinecone knowledge base.
+│   │
+│   ├── knowledge_base/             # End-to-end RAG ingestion pipeline
+│   │   ├── ingestion/
+│   │   │   ├── pdf_to_markdown_converter.py    # Converts PDFs to Markdown using Docling.
+│   │   │   ├── confluence_content_extractor.py # Parses Confluence HTML → Markdown via BeautifulSoup.
+│   │   │   ├── file_saver.py                   # Saves processed markdown files to disk.
+│   │   │   ├── confluence_page_processor.py    # Transforms raw Confluence API page data → Markdown with YAML frontmatter.
+│   │   │   └── url_to_md_converter.py          # Recursively scrapes a Confluence page tree via REST API (handles pagination).
+│   │   ├── processing/
+│   │   │   ├── text_chunker.py             # Hierarchical markdown chunking (headers → recursive char split).
+│   │   │   ├── gemini_embedder.py          # Dense embeddings via Gemini embedding-001 (768-dim).
+│   │   │   ├── pinecone_sparse_embedder.py # Sparse embeddings via Pinecone sparse-english-v0.
+│   │   │   ├── vector_normalizer.py        # L2 normalization for dense and sparse vectors.
+│   │   │   └── retry.py                    # Exponential backoff retry utility for rate-limited APIs.
+│   │   ├── vector_db/
+│   │   │   ├── create_vector_db_index.py   # Creates Pinecone index (768-dim, dotproduct, serverless).
+│   │   │   └── upsert_to_vector_db.py      # Batched upsert of hybrid-embedded chunks into Pinecone.
+│   │   └── pipeline/
+│   │       └── knowledge_base_pipeline.py  # Orchestrates the full ingestion flow end-to-end.
+│   │
+│   ├── schemas/                    # Pydantic models for configuration validation
+│   │   ├── agent_schemas.py        # Validates agent YAML files (provider, model, temperature, etc.).
+│   │   └── architecture_schemas.py # Validates architecture YAML files (WIP).
+│   │
+│   ├── utils/
+│   │   ├── config_loader.py                    # Loads and validates YAML configs against Pydantic schemas.
+│   │   ├── application_streamer.py             # Streams agent graph execution node-by-node.
+│   │   ├── process_events.py                   # Displays tool calls and AI responses from streamed events.
+│   │   └── architecture_diagram_generator.py   # Generates visual diagrams of agent graph architectures.
+│   │
+│   ├── constants.py                # Global constants: directory paths, embedding limits, batch sizes.
+│   └── main.py                     # Future main entry point (WIP).
+│
+├── rag_eval/                       # RAG evaluation module
+│   ├── evaluation_dataset_loader.py  # Loads and validates evaluation datasets from CSV files.
+│   ├── report_generator.py           # Generates timestamped JSON and Markdown evaluation reports.
+│   ├── schemas/
+│   │   └── eval_schemas.py           # Pydantic models: EvalDatasetRow, RetrievalResult, QuestionEvalResult, EvalReport, EvalAgentState.
+│   ├── datasets/                     # Evaluation dataset CSV files (not tracked in git).
+│   └── results/                      # Evaluation output reports (not tracked in git).
+│
+├── tests/
+│   ├── conftest.py                 # Pytest configuration and shared fixtures.
+│   ├── unit/
+│   │   ├── agents/
+│   │   ├── core/
+│   │   ├── tools/
+│   │   ├── utils/
+│   │   ├── rag_eval/
+│   │   └── knowledge_base/
+│   │       ├── ingestion/
+│   │       ├── processing/
+│   │       ├── vector_db/
+│   │       └── pipeline/
+│   └── integration/
+│       └── knowledge_base/
+│
+├── diagrams/
+│   ├── production/                 # Exported graph diagrams for active agent configurations.
+│   └── research/                   # Diagrams from experimental/research work.
+│
+├── research/
+│   └── LangGraph/                  # LangGraph experiments and prototypes.
+│
+├── data/                           # Not tracked in git — see Important Notes below.
+│   ├── raw/                        # Raw input documents.
+│   └── processed/                  # Processed markdown files ready for chunking.
+│
+├── logs/                           # Application log files (auto-created at runtime).
+├── Makefile                        # Common development commands.
+├── pyproject.toml                  # Project metadata and dependencies.
+├── .env.example                    # Template for required environment variables.
+└── .pre-commit-config.yaml         # Pre-commit hook configuration.
+```
 
-## Getting Started 
+---
 
-1. Create and activate a virtual environment:
+## Getting Started
+
+### 1. Clone and create a virtual environment
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
 
-2. Install the package and dev extras (recommended):
+### 2. Install the package
+
 ```bash
+# Install with dev dependencies (recommended)
 pip install -e ".[dev]"
+
+# Or via Makefile
+make install-dev
 ```
 
-3. Run a quick test to verify the environment:
-```bash
-# Run mypy static checks
-python -m mypy src
+### 3. Configure environment variables
 
-# Run the tests
-pytest tests/ -v
-
-# Run the tests with coverage. Report shows missing lines.
-pytest --cov=src --cov-report=term-missing
-```
-
-4. Setup Environment Variables
-
-This project requires API keys to function.
-
-First, copy the example environment file:
+Copy the example file and fill in your API keys:
 
 ```bash
 cp .env.example .env
 ```
 
-Open .env and add the required API keys.
+Open `.env` and set the following:
 
-If you do not know the full file path to your project root, run the following command and copy the output:
+| Variable | Description |
+| :--- | :--- |
+| `GEMINI_API_KEY` | Required for generating dense query and document embeddings. |
+| `EDEN_AI_API_KEY` | Required to run the agent (proxied through OpenAI interface). |
+| `PINECONE_API_KEY` | Required for RAG retrieval and sparse embedding generation. |
+| `PROJECT_ROOT` | Absolute path to the project root directory. |
+
+To get the absolute path to your project root:
+
 ```bash
-# Ensure you are in the project root
 pwd
 ```
 
-## Running the agent
-
-Currently, the single-agent implementation is available for testing.
+### 4. Verify the setup
 
 ```bash
-# Ensure you are in the project root
+# Run static type checks
+python -m mypy src
+
+# Run the full test suite
+pytest tests/ -v
+
+# Run tests with coverage
+pytest tests/ --cov=src --cov-report=term-missing
+```
+
+---
+
+## Running the Agent
+
+The base ReACT agent is the active single-agent implementation:
+
+```bash
 python src/agents/base_agent.py
 ```
 
-Note: Ensure your .env file is set up before running.
+The agent supports 6 tools: RAG search over the UWF knowledge base, web search, advisor lookup, email drafting, email sending, and conversation end.
 
-Eventually, the agentic entry point will be in the main.py file; however, the architecture is not yet finished to do so.
+> Note: Ensure your `.env` file is configured before running. A Pinecone index with the knowledge base vectors must also be populated (see [Building the Knowledge Base](#building-the-knowledge-base) below).
 
-## Running Tests & CI 
+---
 
-Use pytest for local testing:
+## Building the Knowledge Base
+
+The knowledge base pipeline ingests documents, chunks them, generates hybrid embeddings, and uploads them to Pinecone.
+
+1. Place raw PDF or Markdown files in `data/raw/`.
+2. Run the pipeline:
 
 ```bash
+python src/knowledge_base/pipeline/knowledge_base_pipeline.py
+```
+
+Processed markdown files are saved to `data/processed/` and vectors are upserted to your Pinecone index in batches of 50.
+
+---
+
+## Running Tests & CI
+
+```bash
+# Run all tests
 pytest tests/ -v
-```
+make test
 
-For `mypy` / type-checking, run:
+# Run with HTML coverage report
+pytest tests/ --cov=src --cov-report=html
+make test-cov
 
-```bash
+# Type checking
 python -m mypy src
+
+# Linting
+make lint
+
+# Auto-format code
+make format
 ```
 
-CI should run these checks and may use a pinned `requirements-dev.txt` to ensure reproducible test environments.
+---
+
+## Makefile Reference
+
+| Command | Description |
+| :--- | :--- |
+| `make install` | Install project dependencies. |
+| `make install-dev` | Install with dev dependencies. |
+| `make test` | Run the test suite. |
+| `make test-cov` | Run tests with an HTML coverage report. |
+| `make lint` | Run pylint on `src/` and `tests/`. |
+| `make format` | Auto-format code with Black. |
+| `make clean` | Remove `__pycache__`, `.pytest_cache`, build artifacts. |
+
+---
 
 ## Important Notes
 
-If downloading this package from GitHub, the data directory, which includes the raw and processed subdirectories, does not include the files uploaded to the knowledge base. 
-Prior to using the ingestion, processing, or upload functions contained within src/knowledge_base, the user should upload their own files to the appropriate directory.
+- The `data/` directory (raw and processed files) is not tracked in git. Prior to running the ingestion or pipeline scripts, add your own source documents to `data/raw/`.
+- The `rag_eval/datasets/` and `rag_eval/results/` directories are also not tracked in git.
+- The `logs/` directory is created automatically at runtime.
+
+---
 
 ## Helpful Commands
 
-To view the entire project structure from the terminal:
-
 ```bash
+# View the project tree (excludes build/cache directories)
 tree -I "__pycache__|.git|.venv|.pytest_cache"
+
+# List all available Makefile commands
+make help
 ```
-
-
- 
