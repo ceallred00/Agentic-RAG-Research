@@ -55,6 +55,7 @@ class EvaluationDatasetLoader:
             error_msg = f"No valid rows found in {file_path}. Verify format against Pydantic model."
             logger.error(error_msg)
             raise ValueError(error_msg)
+        logger.info(f"Validated {len(validated_rows)} rows from {file_path}")
         return validated_rows
     def _validate_file(self, csv_filepath: Path) -> List[dict]:
         """

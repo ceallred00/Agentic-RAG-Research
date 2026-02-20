@@ -8,22 +8,26 @@ from pinecone.core.openapi.inference.model.sparse_embedding import SparseEmbeddi
 from pinecone.exceptions import PineconeApiException
 from pathlib import Path
 from constants import PROCESSED_DATA_DIR, PINECONE_MAX_BATCH_SIZE
-from typing import Literal, Union, List
+from typing import Literal, Union, List, Optional
+from pinecone.grpc import PineconeGRPC as Pinecone
 from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
 
 class PineconeSparseEmbedder:
-    def __init__(self, execution_service: ExecutionService):
+    def __init__(self, execution_service: ExecutionService, pinecone_client: Optional[Pinecone] = None):
         """
         Initializes the PineconeSparseEmbedder with a Pinecone client.
 
         Args:
             execution_service (ExecutionService) : The service factory used to create
                 configured clients.
+            pinecone_client (Optional[PineconeClient]): An optional pre-configured
+                Pinecone client. If not provided, the embedder will create its own
+                client using the execution service.
         """
-        self.pinecone_client = execution_service.get_pinecone_client()
+        self.pinecone_client = pinecone_client or execution_service.get_pinecone_client()
 
     def embed_KB_document_sparse(self, inputs: Union[List[Document], List[str]]) -> List[SparseEmbedding]:
         """

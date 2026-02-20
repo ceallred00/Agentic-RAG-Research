@@ -1,0 +1,57 @@
+version: "1.0"
+eval_agent_metadata:
+  name: "eval_agent"
+  description: "Agent for evaluating RAG retriever performance on a dataset"
+
+ragas_llm_model:
+  # This model configuration is specifically for the LLM used in computing RAGAS 
+  # metrics within the evaluation graph. 
+  # It is separate from the summary_llm_model used for summarizing results.
+
+  # Uses a RAGAS llm_factory instance, passing in the AsyncOpenAI client configured for 
+  # Eden AI.
+  
+  # This is necessary because the evaluation graph is not compatible with the ChatOpenAI
+  # proxy for Eden AI, thus requiring direct use of the AsyncOpenAI client.
+  
+  # Parameter structure is different than summary_llm_model.
+  # Because the models are specified at the llm_factory level in the graph, not at the 
+  # client level.
+  # Model name uses Eden AI's provider/model format (e.g., "openai/gpt-4o").
+  # Chosen for strong reasoning capabilities on evaluation tasks.
+  model_name: "openai/gpt-4o"
+  provider: "openai"
+
+summary_llm_model:
+  # This model configuration is specifically for the LLM used to generate summaries of
+  # RAG evaluation results in the evaluation graph.
+
+  # It is separate from the ragas_llm_model used for computing RAGAS metrics.
+
+  # Uses a standard ChatOpenAI client configured for Eden AI, wrapped in a ChatOpenAI
+  # proxy. This is compatible with the LangGraph framework used in the evaluation graph.
+  model_name: "openai/gpt-4o-mini"
+
+
+
+retriever:
+  type: "StructuredRagRetriever"
+  top_k_matches: 5
+  # Note: Changing the following parameters does not impact the evaluation graph.
+  # The models are hardcoded in their respective Embedder classes.
+  
+  # This ensures that query embeddings match the embeddings used to index the 
+  # retriever's knowledge base.
+  
+  # This match is crucial for accurate retrieval and valid evaluation results.
+  # These parameters are included here for transparency only.
+  dense_embedding_model: "gemini-embedding-001"
+  sparse_embedding_model: "pinecone-sparse-english-v0"
+  index_name: "uwf-kb-1"
+
+report:
+  output_dir: "rag_eval/results"
+  encoding: "utf-8"
+
+data:
+  csv_dir: "rag_eval/datasets"

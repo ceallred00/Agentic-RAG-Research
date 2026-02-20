@@ -2,12 +2,13 @@
 
 import os
 import logging
+from typing import Dict, Literal, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_openai import ChatOpenAI
-from typing import Dict, Literal, Optional
-from schemas.agent_schemas import AgentConfig
 from pydantic import SecretStr
 from pinecone.grpc import PineconeGRPC as Pinecone
+from openai import AsyncOpenAI
+from schemas.agent_schemas import AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +48,13 @@ class ExecutionService:
 
     def get_gemini_client(self, agent_name: str):
         """
-        Factory method to create a configured ChatGoogleGenerativeAI client based on a specific agent configuration.
+        Factory method to create a configured ChatGoogleGenerativeAI client based on a
+        specific agent configuration.
 
         Parameters:
             agent_name (str):
-                The name of the agent whose configuration will be used to set up the client.
+                The name of the agent whose configuration will be used to set up the
+                client.
 
         Raises:
             ValueError:
@@ -70,7 +73,8 @@ class ExecutionService:
 
         if not agent_specific_config:
             raise ValueError(
-                f" Agent '{agent_name}' not found in loaded configurations. Check YAML files against Pydantic models."
+                f"""Agent '{agent_name}' not found in loaded configurations.
+                Check YAML files against Pydantic models."""
             )
 
         model_name = agent_specific_config.model.name
@@ -80,7 +84,8 @@ class ExecutionService:
             gemini_model = ChatGoogleGenerativeAI(model=model_name, temperature=model_temperature, api_key=api_key)
 
             logger.info(
-                f"Gemini client created for agent '{agent_name}' with model '{model_name}' and temperature {model_temperature}."
+                f"""Gemini client created for agent '{agent_name}' with
+                model '{model_name}' and temperature {model_temperature}."""
             )
 
         except Exception as e:
@@ -98,7 +103,8 @@ class ExecutionService:
         Factory method to create a configured Dense Embedding client.
 
         Note:
-            GoogleGenerativeAIEmbeddings class automatically checks for the existence of the GEMINI_API_KEY environment variable.
+            GoogleGenerativeAIEmbeddings class automatically checks for the existence of
+            the GEMINI_API_KEY environment variable.
         """
         logger.info(f"Creating Embedding client for model: {model_name}")
 
@@ -137,7 +143,7 @@ class ExecutionService:
             logger.error(f"Error creating Pinecone client: {e}")
             raise
 
-    def get_eden_ai_client(self, model_name: str = "openai/gpt-4") -> ChatOpenAI:
+    def get_eden_ai_client(self, model_name: str = "openai/gpt-4o") -> ChatOpenAI:
         """
         Factory method to create an Eden AI client, using the
         ChatOpenAI proxy.
@@ -179,4 +185,39 @@ class ExecutionService:
             return llm
         except Exception as e:
             logger.error(f"Error creating Eden AI client: {e}")
+            raise
+    
+    def get_eden_ai_async_client(self) -> AsyncOpenAI:
+        """
+        Factory method to create an Eden AI async client.
+
+        Returns:
+            Configured AsyncOpenAI client instance.
+        
+        NOTE: This method is specifically designed to create an async client for Eden AI
+        for use in streaming scenarios within the rag evaluation graph.
+        The RAG evaluation graph is not compatible with the ChatOpenAI proxy for Eden AI
+        thus necessitating the use of the AsyncOpenAI client directly configured for 
+        Eden AI's API.
+
+        NOTE: This client does not speicfy a model at the client level. 
+        The model name is specified when passed to ragas.llm.llm_factory():
+            
+            llm_factory(model="gpt-4o",
+                        provider = "openai",
+                        client=async_client)
+        """
+        logger.info(f"Creating Eden AI async connection client.")
+
+        eden_api_key = self._validate_api_key("EDEN_AI_API_KEY")
+
+        try:
+            async_client = AsyncOpenAI(
+                api_key=eden_api_key,
+                base_url="https://api.edenai.run/v3/llm",
+            )
+            logger.info(f"Eden AI async connection client created.")
+            return async_client
+        except Exception as e:
+            logger.error(f"Error creating Eden AI async client: {e}")
             raise

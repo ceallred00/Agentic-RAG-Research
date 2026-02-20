@@ -7,6 +7,7 @@ from knowledge_base.processing.pinecone_sparse_embedder import PineconeSparseEmb
 
 logger = logging.getLogger(__name__)
 
+
 class RagRetriever:
     """
     Shared retrieval engine for hybrid RAG search (dense + sparse)

@@ -25,6 +25,7 @@ UWF_PUBLIC_KB_PROCESSED_DATE_DIR = PROCESSED_DATA_DIR / "uwf_public_kb"
 RAG_EVAL_DIR = ROOT_DIR / "rag_eval"
 RAG_EVAL_DATA_DIR = RAG_EVAL_DIR / "datasets"
 RAG_EVAL_RESULTS_DIR = RAG_EVAL_DIR / "results"
+RAG_EVAL_CONFIG_DIR = CONFIGS_DIR / "eval"
 
 # --- Embedding Model Constraints ---
 # Token Approximation: 1 token ~= 4 chars. 2048 * 4 = 8192 chars.
