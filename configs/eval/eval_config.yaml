@@ -21,6 +21,8 @@ ragas_llm_model:
   # Chosen for strong reasoning capabilities on evaluation tasks.
   model_name: "openai/gpt-4o"
   provider: "openai"
+  # Set to 0.0 for deterministic, reproducible metric scoring across evaluation runs.
+  temperature: 0.0
 
 summary_llm_model:
   # This model configuration is specifically for the LLM used to generate summaries of

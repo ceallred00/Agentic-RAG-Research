@@ -143,7 +143,7 @@ class ExecutionService:
             logger.error(f"Error creating Pinecone client: {e}")
             raise
 
-    def get_eden_ai_client(self, model_name: str = "openai/gpt-4o") -> ChatOpenAI:
+    def get_eden_ai_client(self, model_name: str = "openai/gpt-4o", temperature: float = 1.0) -> ChatOpenAI:
         """
         Factory method to create an Eden AI client, using the
         ChatOpenAI proxy.
@@ -166,11 +166,15 @@ class ExecutionService:
 
                 Available models can be found at this link:
                 https://docs.edenai.co/v3/how-to/llm/chat-completions#available-models
+            temperature (float):
+                Sampling temperature. Lower values produce more deterministic
+                output; higher values produce more varied output.
+                Defaults to 1.0 (model default).
 
         Returns:
             Configured ChatOpenAI client instance.
         """
-        logger.info(f"Creating Eden AI client for model: {model_name}")
+        logger.info(f"Creating Eden AI client for model: {model_name}, temperature: {temperature}")
 
         eden_api_key = self._validate_api_key("EDEN_AI_API_KEY")
 
@@ -180,6 +184,7 @@ class ExecutionService:
                 api_key=SecretStr(eden_api_key),
                 base_url="https://api.edenai.run/v3/llm",
                 streaming=True,
+                temperature=temperature,
             )
             logger.info(f"Eden AI client created for model '{model_name}'.")
             return llm

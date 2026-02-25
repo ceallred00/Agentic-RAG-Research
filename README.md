@@ -26,6 +26,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deeper look at design decisions.
 │   │   ├── coordination_agent.yaml
 │   │   ├── email_agent.yaml
 │   │   └── web_search_agent.yaml
+│   ├── eval/                       # YAML configuration for the RAG evaluation pipeline
+│   │   └── eval_config.yaml        # Specifies RAGAS LLM, summary LLM, retriever, report, and data settings.
 │   └── architectures/              # YAML definitions for multi-agent architectures (WIP)
 │
 ├── src/
@@ -39,13 +41,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deeper look at design decisions.
 │   ├── architectures/              # Multi-agent orchestration logic (WIP)
 │   │
 │   ├── core/                       # Application infrastructure
-│   │   ├── execution_service.py    # Factory for creating LLM, embedding, and vector DB clients.
+│   │   ├── execution_service.py    # Factory for LLM (Gemini, Eden AI), embedding, and Pinecone clients.
 │   │   ├── agent_state.py          # Defines AgentState TypedDict with message history.
-│   │   ├── logging_setup.py        # Dual logging: file handler (DEBUG) + console handler (WARNING).
+│   │   ├── logging_setup.py        # Dual logging: file handler (INFO) + configurable console handler (INFO default).
 │   │   └── architecture_manager.py # Orchestrates multi-agent architectures (WIP).
 │   │
 │   ├── tools/                      # LangGraph tool implementations
-│   │   └── perform_rag_tool.py     # Hybrid RAG search (dense + sparse) over the Pinecone knowledge base.
+│   │   ├── perform_rag_tool.py     # Hybrid RAG search (dense + sparse) over the Pinecone knowledge base.
+│   │   └── rag_retriever.py        # Shared RagRetriever class used by both the agent and eval pipeline.
 │   │
 │   ├── knowledge_base/             # End-to-end RAG ingestion pipeline
 │   │   ├── ingestion/
@@ -80,10 +83,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deeper look at design decisions.
 │   └── main.py                     # Future main entry point (WIP).
 │
 ├── rag_eval/                       # RAG evaluation module
+│   ├── run_eval.py                   # CLI entry point for running the evaluation pipeline.
+│   ├── run_dataset_generator.py      # CLI entry point for generating evaluation datasets.
+│   ├── eval_graph.py                 # LangGraph evaluation pipeline (load → retrieve → score → report → summarize).
+│   ├── dataset_generator.py          # DatasetGenerator class: samples KB docs and generates Q&A pairs via LLM.
 │   ├── evaluation_dataset_loader.py  # Loads and validates evaluation datasets from CSV files.
 │   ├── report_generator.py           # Generates timestamped JSON and Markdown evaluation reports.
+│   ├── components/
+│   │   ├── ragas_metrics.py          # Async RAGAS metric computation (ContextPrecision, ContextRecall).
+│   │   └── structured_rag_retriever.py  # Adapter wrapping RagRetriever to return RetrievalResult objects.
 │   ├── schemas/
-│   │   └── eval_schemas.py           # Pydantic models: EvalDatasetRow, RetrievalResult, QuestionEvalResult, EvalReport, EvalAgentState.
+│   │   ├── eval_schemas.py           # Pydantic models: EvalDatasetRow, RetrievalResult, QuestionEvalResult, EvalReport, EvalAgentState, LLM/retriever configs.
+│   │   └── dataset_schemas.py        # Pydantic models: QAPair, QAPairList (LLM output), DatasetRow (CSV row).
 │   ├── datasets/                     # Evaluation dataset CSV files (not tracked in git).
 │   └── results/                      # Evaluation output reports (not tracked in git).
 │
@@ -206,6 +217,58 @@ python src/knowledge_base/pipeline/knowledge_base_pipeline.py
 ```
 
 Processed markdown files are saved to `data/processed/` and vectors are upserted to your Pinecone index in batches of 50.
+
+---
+
+## Generating an Evaluation Dataset
+
+The dataset generator samples documents from the knowledge base and uses an LLM to produce realistic Q&A pairs for RAG retrieval evaluation.
+
+```bash
+.venv/bin/python -m rag_eval.run_dataset_generator \
+    --sample-size 50 \
+    --output-filename my_dataset.csv
+```
+
+Key options:
+
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--sample-size` | *(required)* | Number of KB documents to randomly sample. |
+| `--output-filename` | *(required)* | Name of the output CSV file. |
+| `--n-questions` | `1` | Number of Q&A pairs to generate per document. |
+| `--model` | `anthropic/claude-haiku-4-5` | Eden AI model in `provider/model` format. |
+| `--temperature` | `0.0` | LLM sampling temperature. `0.0` = deterministic. |
+| `--output-dir` | `rag_eval/datasets` | Directory to save the generated CSV. |
+| `--min-doc-length` | `200` | Minimum document character length to include. |
+
+The current date is automatically prepended to the filename in `YYYYMMDD_` format — passing `--output-filename dataset_batch_1.csv` produces `20260225_dataset_batch_1.csv`. Generated CSV files are saved to `rag_eval/datasets/`.
+
+---
+
+## Running the RAG Evaluation
+
+The evaluation pipeline retrieves contexts from Pinecone for each question in a dataset, computes RAGAS metrics (Context Precision and Context Recall), generates a report, and produces an LLM summary.
+
+```bash
+.venv/bin/python -m rag_eval.run_eval \
+    --csv-filename 20260225_dataset_batch_1.csv \
+    --dataset-name "KB Baseline Batch 1" \
+    --dataset-description "50-question batch, hybrid search, top_k=5"
+```
+
+Key options:
+
+| Argument | Default | Description |
+| :--- | :--- | :--- |
+| `--csv-filename` | *(required)* | CSV file in `rag_eval/datasets/`. |
+| `--dataset-name` | *(required)* | Name label used in the report. |
+| `--dataset-description` | *(required)* | Description of the run for reporting context. |
+| `--config-path` | `configs/eval/eval_config.yaml` | Path to the evaluation configuration YAML. |
+
+Reports (JSON + Markdown) are saved to `rag_eval/results/`. The LLM summary is printed to stdout.
+
+> Note: A populated Pinecone index is required. See [Building the Knowledge Base](#building-the-knowledge-base).
 
 ---
 

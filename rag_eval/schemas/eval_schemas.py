@@ -72,9 +72,14 @@ class EvalRagasLLMConfig(BaseModel):
         - model_name: sent to Eden AI's API in provider/model format (e.g., 'openai/gpt-4o')
         - provider: used by llm_factory to select the correct internal adapter (e.g., 'openai'
           selects the Instructor adapter; 'google' selects the LiteLLM adapter)
+
+    Temperature is set to 0.0 by default to ensure deterministic, reproducible metric
+    scores across evaluation runs. Since RAGAS makes graded judgments about retrieval
+    quality, consistency is more important than variation.
     """
     model_name: Annotated[str, Field(description="The model name in Eden AI's provider/model format (e.g., 'openai/gpt-4o').")]
     provider: Annotated[str, Field(description="The model provider passed to llm_factory for internal adapter selection (e.g., 'openai').")]
+    temperature: Annotated[float, Field(default=0.0, ge=0.0, le=2.0, description="Sampling temperature for the RAGAS evaluation LLM. Defaults to 0.0 for deterministic scoring.")]
 
 class EvalSummaryLLMConfig(BaseModel):
     """

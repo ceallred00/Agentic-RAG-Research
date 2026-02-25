@@ -98,6 +98,7 @@ async def main():
         model=validated_config.ragas_llm_model.model_name,
         provider=validated_config.ragas_llm_model.provider,
         client=async_client,
+        temperature=validated_config.ragas_llm_model.temperature,
     )
 
     # Configure Summary LLM
