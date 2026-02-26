@@ -1,5 +1,4 @@
 import csv
-import json
 import logging
 import random
 import datetime
@@ -28,10 +27,10 @@ class DatasetGenerator:
         
         Raises a FileNotFoundError if the directory does not exist.
         """
-        if not self.kb_dir.exists():
+        if not self.kb_dir.is_dir():
             error_msg = f"Knowledge base directory {self.kb_dir} does not exist."
             logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
+            raise NotADirectoryError(error_msg)
         docs = list(self.kb_dir.glob("*.md"))
         logger.info(f"Found {len(docs)} documents in knowledge base directory {self.kb_dir}")
         return docs

@@ -27,9 +27,8 @@ used to analyze retriever performance and identify areas for improvement.
 """
 
 import logging
-from typing import List, Union
+from typing import Union
 from pathlib import Path
-import numpy as np
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
 from langchain_core.language_models import BaseChatModel
@@ -41,9 +40,10 @@ from rag_eval.schemas.eval_schemas import (
     EvalReport,
 )
 from rag_eval.components.structured_rag_retriever import StructuredRagRetriever
-from rag_eval.evaluation_dataset_loader import EvaluationDatasetLoader
+from rag_eval.components.evaluation_dataset_loader import EvaluationDatasetLoader
 from rag_eval.components.ragas_metrics import compute_ragas_metrics
-from rag_eval.report_generator import ReportGenerator
+from rag_eval.components.eval_report_generator import EvalReportGenerator
+from rag_eval.utils.compute_aggregate_metrics import compute_average
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def build_eval_graph(
     top_k_matches: int,
     eval_llm: InstructorBaseRagasLLM,
     summary_llm: BaseChatModel,
-    report_generator: ReportGenerator,
+    eval_report_generator: EvalReportGenerator,
     dataset_name: str,
     dataset_description: str,
     encoding: str = "utf-8",
@@ -190,7 +190,7 @@ def build_eval_graph(
     def generate_eval_report(state: EvalAgentState) -> dict:
         """
         Aggregates per-question RAGAS results into a final EvalReport and generates
-        JSON and Markdown reports using the ReportGenerator component.
+        JSON and Markdown reports using the EvalReportGenerator component.
 
         The generated report file paths are returned in the state for reference.
         """
@@ -200,10 +200,9 @@ def build_eval_graph(
         # Aggregate per-question results into final report
         results_list = state["eval_results"]  # List of QuestionEvalResult objects
 
-        # Using np arrays for efficient aggregation of precision and recall scores.
         recall_scores, precision_scores = zip(*[(r.context_recall, r.context_precision) for r in results_list])
-        average_recall = float(np.mean(recall_scores))
-        average_precision = float(np.mean(precision_scores))
+        average_recall = compute_average(list(recall_scores))
+        average_precision = compute_average(list(precision_scores))
 
         report = EvalReport(
             average_context_recall=average_recall,
@@ -213,7 +212,7 @@ def build_eval_graph(
             per_question_results=results_list,
             description=dataset_description,
         )
-        json_path, md_path = report_generator.generate_report(report=report)
+        json_path, md_path = eval_report_generator.generate_report(report=report)
         return {"final_report": report,
                 "json_report_path": str(json_path),
                 "md_report_path": str(md_path)}

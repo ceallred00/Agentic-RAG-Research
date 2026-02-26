@@ -4,14 +4,14 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 import json
 
-from rag_eval.report_generator import ReportGenerator
+from rag_eval.components.eval_report_generator import EvalReportGenerator
 
 @pytest.fixture
 def sample_timestamp():
     return "20260218_143052"
 
-class TestReportGenerator:
-    """Tests for ReportGenerator: file generation, JSON/Markdown writing, and error handling."""
+class TestEvalReportGenerator:
+    """Tests for EvalReportGenerator: file generation, JSON/Markdown writing, and error handling."""
 
     class TestGenerateReport:
         """Tests for the generate_report orchestrator method."""
@@ -38,7 +38,7 @@ class TestReportGenerator:
             assert "# RAG Evaluation Report" in md_content
         def test_generate_report_dir_not_exist(self, sample_eval_report, caplog):
             """Non-existent output directory raises FileNotFoundError."""
-            generator = ReportGenerator(output_dir= "invalid/data/dir")
+            generator = EvalReportGenerator(output_dir="invalid/data/dir")
 
             with pytest.raises(FileNotFoundError):
                 generator.generate_report(report = sample_eval_report)
@@ -53,7 +53,7 @@ class TestReportGenerator:
             expected_md = valid_data_dir / f"eval_{sample_timestamp}.md"
             
             # Act
-            with patch("rag_eval.report_generator.datetime") as mock_dt:
+            with patch("rag_eval.components.report_generator.datetime") as mock_dt:
                 mock_dt.now.return_value.strftime.return_value = sample_timestamp
                 json_path, md_path, timestamp = report_generator_instance._generate_filepaths()
             

@@ -19,9 +19,11 @@ from knowledge_base.ingestion.url_to_md_converter import URLtoMarkdownConverter
 from knowledge_base.processing.text_chunker import TextChunker
 from knowledge_base.pipeline.knowledge_base_pipeline import KnowledgeBasePipeline
 
-from rag_eval.evaluation_dataset_loader import EvaluationDatasetLoader
-from rag_eval.report_generator import ReportGenerator
+from rag_eval.components.evaluation_dataset_loader import EvaluationDatasetLoader
+from rag_eval.components.eval_report_generator import EvalReportGenerator
+from rag_eval.components.analysis_report_generator import AnalysisReportGenerator
 from rag_eval.schemas.eval_schemas import EvalReport, QuestionEvalResult
+from rag_eval.schemas.analysis_schemas import EvalReportSummary, AggregatedPoorResult
 
 from tools.rag_retriever import RagRetriever
 from tools.perform_rag_tool import PerformRagTool
@@ -538,8 +540,16 @@ def valid_csv_file(valid_csv_filepath):
 
 @pytest.fixture
 def report_generator_instance(valid_data_dir):
-    instance = ReportGenerator(output_dir= valid_data_dir)
-    return instance
+    return EvalReportGenerator(output_dir=valid_data_dir)
+
+
+@pytest.fixture
+def analysis_report_generator_instance(valid_data_dir):
+    return AnalysisReportGenerator(
+        output_dir=valid_data_dir,
+        results_dir=valid_data_dir,
+        tracker_path=valid_data_dir / "metrics_tracker.csv"
+    )
 
 @pytest.fixture                                                                                                                                                                                                                                
 def sample_eval_report():                                                                                           
@@ -565,7 +575,55 @@ def sample_eval_report():
         ]
     )
 
-# ==============================================================================                                                                                                                                                               
+@pytest.fixture
+def sample_eval_report_summary():
+    return EvalReportSummary(
+        file_names=["eval_run_1", "eval_run_2", "eval_run_3"],
+        dataset_name="test_dataset.csv",
+        description="Baseline hybrid search, top_k=5",
+        cross_run_average_context_recall=0.60,
+        cross_run_average_context_precision=0.55,
+        cross_run_std_context_recall=0.05,
+        cross_run_std_context_precision=0.04,
+        per_run_context_recall=[0.60, 0.65, 0.55],
+        per_run_context_precision=[0.55, 0.58, 0.52],
+        poor_recall_results=[
+            AggregatedPoorResult(
+                question="What is the deadline for dropping a class?",
+                scores=[0.30, 0.35, 0.28],
+                avg_score=0.31,
+                runs_below_threshold=3,
+                contexts_per_run=[
+                    ["The add/drop period has ended.", "See the academic calendar."],
+                    ["The add/drop period has ended.", "Contact your advisor."],
+                    ["The add/drop period has ended.", "See the academic calendar."],
+                ]
+            )
+        ],
+        poor_precision_results=[
+            AggregatedPoorResult(
+                question="How do I apply for financial aid?",
+                scores=[0.40, 0.38],
+                avg_score=0.39,
+                runs_below_threshold=2,
+                contexts_per_run=[
+                    ["Submit FAFSA by June 30th.", "Financial aid office is located in Building 20.", "Scholarships are available."],
+                    ["Financial aid office is located in Building 20.", "Submit FAFSA by June 30th.", "Scholarships are available."],
+                ]
+            )
+        ]
+    )
+
+
+@pytest.fixture
+def sample_eval_report_json_file(valid_data_dir, sample_eval_report):
+    """Writes sample_eval_report to disk as JSON and returns the file path."""
+    json_path = valid_data_dir / "eval_test_run.json"
+    json_path.write_text(sample_eval_report.model_dump_json(indent=2), encoding="utf-8")
+    return json_path
+
+
+# ==============================================================================
 # 7. RAG RETRIEVER FIXTURES                                                                                                                                                                                                                    
 # ==============================================================================     
 

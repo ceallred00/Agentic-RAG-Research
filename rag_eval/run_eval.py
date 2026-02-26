@@ -32,8 +32,8 @@ from ragas.llms import llm_factory
 
 from rag_eval.schemas.eval_schemas import EvalAgentConfig
 from rag_eval.components.structured_rag_retriever import StructuredRagRetriever
-from rag_eval.eval_graph import build_eval_graph
-from rag_eval.report_generator import ReportGenerator
+from rag_eval.components.eval_graph import build_eval_graph
+from rag_eval.components.eval_report_generator import EvalReportGenerator
 from core.execution_service import ExecutionService
 from tools.rag_retriever import RagRetriever
 from knowledge_base.processing.gemini_embedder import GeminiEmbedder
@@ -107,7 +107,7 @@ async def main():
     summary_llm = execution_service.get_eden_ai_client(model_name=validated_config.summary_llm_model.model_name)
 
     # Configure Report Generator Instance
-    eval_report_generator = ReportGenerator(output_dir=validated_config.report.output_dir)
+    eval_report_generator = EvalReportGenerator(output_dir=validated_config.report.output_dir)
 
     # Build the evaluation graph with the configured components and validated configuration
     eval_graph = build_eval_graph(

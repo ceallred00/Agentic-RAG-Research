@@ -26,6 +26,8 @@ RAG_EVAL_DIR = ROOT_DIR / "rag_eval"
 RAG_EVAL_DATA_DIR = RAG_EVAL_DIR / "datasets"
 RAG_EVAL_RESULTS_DIR = RAG_EVAL_DIR / "results"
 RAG_EVAL_CONFIG_DIR = CONFIGS_DIR / "eval"
+RAG_EVAL_ANALYSIS_DIR = RAG_EVAL_DIR / "analysis"
+RAG_EVAL_TRACKER_PATH = RAG_EVAL_ANALYSIS_DIR / "metrics_tracker.csv"
 
 # --- Embedding Model Constraints ---
 # Token Approximation: 1 token ~= 4 chars. 2048 * 4 = 8192 chars.

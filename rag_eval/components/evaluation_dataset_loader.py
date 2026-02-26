@@ -103,9 +103,11 @@ class EvaluationDatasetLoader:
                 headers = reader.fieldnames
                 expected_headers = list(EvalDatasetRow.model_fields.keys())
 
-                # Verify headers
-                if headers != expected_headers:
-                    error_msg = f"Incorrect header format. Please verify against expected headers: {expected_headers}."
+                # Verify all required headers are present. Extra columns (e.g. 'source')
+                # are allowed and will be ignored by the Pydantic model.
+                if not set(expected_headers).issubset(set(headers)):
+                    missing = set(expected_headers) - set(headers)
+                    error_msg = f"Missing required headers: {sorted(missing)}. Expected: {expected_headers}."
                     logger.error(error_msg)
                     raise ValueError(error_msg)
 

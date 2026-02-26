@@ -19,7 +19,7 @@ from constants import (
     UWF_PUBLIC_KB_PROCESSED_DATE_DIR,
     RAG_EVAL_DATA_DIR,
 )
-from rag_eval.dataset_generator import DatasetGenerator
+from rag_eval.components.dataset_generator import DatasetGenerator
 
 setup_logging()
 logger = logging.getLogger(__name__)
