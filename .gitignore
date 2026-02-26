@@ -22,6 +22,14 @@ results/
 research/
 data/*
 !data/.gitkeep
+!data/raw/
+!data/processed/
+data/raw/*
 !data/raw/.gitkeep
+data/processed/*
 !data/processed/.gitkeep
 *.code-workspace
+rag_eval/analysis/*.json
+rag_eval/analysis/*.md
+rag_eval/analysis/*.csv
+!rag_eval/analysis/.gitkeep
